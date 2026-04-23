@@ -1,5 +1,4 @@
 /sim_build/
 /waveforms/
-.venv
 results.xml
 /test/__pycache__/
