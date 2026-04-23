@@ -130,7 +130,7 @@ async def test_vector_unit(dut):
     dut.bias_scalar_in_1.value = to_fixed(B2[0])
     # dut.bias_scalar_in_1.value = to_fixed(B2[1])
     dut.lr_leak_factor_in.value = to_fixed(0.5)
-    dut.inv_batch_size_times_two_in = to_fixed(2/4)  # 2/N where N is our batch size which is 4
+    dut.inv_batch_size_times_two_in.value = to_fixed(2/4)  # 2/N where N is our batch size which is 4
     dut.vpu_data_in_1.value = to_fixed(Z2_pre[0][0])
     # dut.vpu_data_in_2.value = to_fixed(z[1])
     await RisingEdge(dut.clk)
@@ -155,7 +155,7 @@ async def test_vector_unit(dut):
 
     dut.Y_in_1.value = to_fixed(Y[2][0])
     # dut.Y_in_2.value = to_fixed(Y[0][0])
-    dut.vpu_valid_in_1 = 0
+    dut.vpu_valid_in_1.value = 0
     await RisingEdge(dut.clk)
 
     dut.Y_in_1.value = to_fixed(Y[3][0])
@@ -186,8 +186,8 @@ async def test_vector_unit(dut):
     dut.vpu_data_in_1.value = to_fixed(dL_by_H1[0][0])
     dut.H_in_1.value = to_fixed(H1[0][0])
 
-    dut.vpu_valid_in_1 = 1 
-    dut.vpu_valid_in_2 = 0
+    dut.vpu_valid_in_1.value = 1 
+    dut.vpu_valid_in_2.value = 0
 
     await RisingEdge(dut.clk)
     dut.vpu_data_in_1.value = to_fixed(dL_by_H1[1][0])
@@ -196,8 +196,8 @@ async def test_vector_unit(dut):
     dut.H_in_1.value = to_fixed(H1[1][0])
     dut.H_in_2.value = to_fixed(H1[0][1])
 
-    dut.vpu_valid_in_1 = 1
-    dut.vpu_valid_in_2 = 1
+    dut.vpu_valid_in_1.value = 1
+    dut.vpu_valid_in_2.value = 1
     await RisingEdge(dut.clk)
 
     dut.vpu_data_in_1.value = to_fixed(dL_by_H1[2][0])
@@ -206,8 +206,8 @@ async def test_vector_unit(dut):
     dut.H_in_1.value = to_fixed(H1[2][0])
     dut.H_in_2.value = to_fixed(H1[1][1])
 
-    dut.vpu_valid_in_1 = 1
-    dut.vpu_valid_in_2 = 1
+    dut.vpu_valid_in_1.value = 1
+    dut.vpu_valid_in_2.value = 1
     await RisingEdge(dut.clk)
 
     dut.vpu_data_in_1.value = to_fixed(dL_by_H1[3][0])
@@ -224,8 +224,8 @@ async def test_vector_unit(dut):
 
     dut.H_in_2.value = to_fixed(H1[3][1])
 
-    dut.vpu_valid_in_1 = 0
-    dut.vpu_valid_in_2 = 1
+    dut.vpu_valid_in_1.value = 0
+    dut.vpu_valid_in_2.value = 1
 
 
     await ClockCycles(dut.clk, 10)
