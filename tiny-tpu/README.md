@@ -195,19 +195,38 @@ We are open source and appreciate any contributions! Here is our workflow and st
 
 ### Ubuntu/Linux Specific
 
-1. Create a virtual environment and run:
+1. Install system-level packages for python, iverilog and gtkwave:
    ```bash
+   sudo apt-get update
+   sudo apt-get install iverilog gtkwave python3-dev python3-venv python3-pip make
+   ```
+2. Inside the root folder `tiny-tpu/` create virtual environment:
+   ```bash
+   python3.10 -m venv .venv
+   ```
+3. Activate virtual environment:
+   ```bash
+   source .venv/bin/activate
+   ```
+   **Note:** Make sure to run `source .venv/bin/activate` every time before running `make`.
+
+4. With the .venv active (`(.venv)` should appear beside terminal prompt), install Cocotb and update standard Python build tools to prevent the missing module errors.
+
+   ```bash
+   pip install --upgrade pip setuptools wheel
    pip install cocotb
    ```
-2. Install gtkwave:
+5. Install numpy
    ```bash
-   sudo apt install gtkwave
+   pip install numpy
    ```
-3. Install iverilog:
-   ```bash
-   sudo apt install iverilog
-   ```
-
+Check if above have installations are successful:
+ ```bash
+ iverilog -V
+ which pip
+ cocotb-config --lib-dir
+ pip show numpy
+ ```
 ## Adding Modules
 
 Follow these steps to add a new module to the project:
