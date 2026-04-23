@@ -208,7 +208,7 @@ We are open source and appreciate any contributions! Here is our workflow and st
    ```bash
    source .venv/bin/activate
    ```
-   **Note:** Make sure to run `source .venv/bin/activate` every time before running `make`.
+   **Note:** Make sure to run `source .venv/bin/activate` every time before running `make`. Use `deactivate` to exit virtual environment.
 
 4. With the .venv active (`(.venv)` should appear beside terminal prompt), install Cocotb and update standard Python build tools to prevent the missing module errors.
 
