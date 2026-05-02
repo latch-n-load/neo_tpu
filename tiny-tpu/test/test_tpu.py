@@ -1,5 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
+from cocotb.triggers import with_timeout
 from cocotb.triggers import RisingEdge, FallingEdge, ClockCycles
 import numpy as np
 
@@ -356,7 +357,7 @@ async def test_tpu(dut):
     dut.ub_rd_row_size.value = 4
     dut.ub_rd_col_size.value = 2
     await RisingEdge(dut.clk)
-
+    dut._log.info("Finished loading B1 from UB to VPU") # DEBUG log
     dut.ub_rd_start_in.value = 0
     dut.ub_rd_transpose.value = 0
     dut.ub_ptr_select.value = 0
@@ -364,6 +365,8 @@ async def test_tpu(dut):
     dut.ub_rd_row_size.value = 0
     dut.ub_rd_col_size.value = 0
     await FallingEdge(dut.vpu_valid_out_1)
+    # await with_timeout(FallingEdge(dut.vpu_valid_out_1), 200, 'ns')
+    # dut._log.error("Simulation timed out waiting for vpu_valid_out_1 to fall!")
 
     # NOW CALCULATING LEAF NODES (Weight gradients, requires tiling)
     

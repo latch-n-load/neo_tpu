@@ -202,7 +202,7 @@ We are open source and appreciate any contributions! Here is our workflow and st
    ```
 2. Inside the root folder `tiny-tpu/` create virtual environment:
    ```bash
-   python3.10 -m venv .venv
+   python3 -m venv .venv
    ```
 3. Activate virtual environment:
    ```bash
