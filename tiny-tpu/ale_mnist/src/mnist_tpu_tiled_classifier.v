@@ -40,10 +40,10 @@ module mnist_tpu_tiled_classifier #(
 
     // Ale
     // parameter integer PRELOAD_MODEL = 0,
-    parameter W1_INIT_FILE = "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh",
-    parameter B1_INIT_FILE = "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh",
-    parameter W2_INIT_FILE = "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh",
-    parameter B2_INIT_FILE = "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
+    parameter W1_INIT_FILE = "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w1_tiled_q8_8.memh",
+    parameter B1_INIT_FILE = "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b1_q8_8.memh",
+    parameter W2_INIT_FILE = "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w2_tiled_q8_8.memh",
+    parameter B2_INIT_FILE = "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b2_q8_8.memh"
     // \Ale
 ) (
     input wire clk,
