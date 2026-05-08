@@ -1,9 +1,8 @@
 // ==============================================================================
 // FILE: mnist_tpu_tiled_classifier_tb.v
-// Verilator-compatible testbench wrapper
 // ==============================================================================
 
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 `default_nettype none
 
 module mnist_tpu_tiled_classifier_tb #(
@@ -37,37 +36,39 @@ module mnist_tpu_tiled_classifier_tb #(
     output wire debug_tpu_rst
 );
 
-    mnist_tpu_tiled_classifier #(
-        .PIXELS(PIXELS),
-        .PIXEL_ADDR_WIDTH(PIXEL_ADDR_WIDTH),
-        .HIDDEN_NEURONS(HIDDEN_NEURONS),
-        .HIDDEN_ADDR_WIDTH(HIDDEN_ADDR_WIDTH),
-        .OUTPUT_NEURONS(OUTPUT_NEURONS),
-        .OUTPUT_ADDR_WIDTH(OUTPUT_ADDR_WIDTH),
-        .TILE_WIDTH(TILE_WIDTH),
-        .UNIFIED_BUFFER_WIDTH(UNIFIED_BUFFER_WIDTH),
-        .PRELOAD_MODEL(0)
-    ) dut (
-        .clk(clk),
-        .rst(rst),
-        .start(start),
-        .pixel_data_in(pixel_data_in),
-        .pixel_addr_out(pixel_addr_out),
-        .busy(busy),
-        .done(done),
-        .prediction_out(prediction_out)
-    );
+  mnist_tpu_tiled_classifier #(
+      .PIXELS(PIXELS),
+      .PIXEL_ADDR_WIDTH(PIXEL_ADDR_WIDTH),
+      .HIDDEN_NEURONS(HIDDEN_NEURONS),
+      .HIDDEN_ADDR_WIDTH(HIDDEN_ADDR_WIDTH),
+      .OUTPUT_NEURONS(OUTPUT_NEURONS),
+      .OUTPUT_ADDR_WIDTH(OUTPUT_ADDR_WIDTH),
+      .TILE_WIDTH(TILE_WIDTH),
+      .UNIFIED_BUFFER_WIDTH(UNIFIED_BUFFER_WIDTH)
+      //.PRELOAD_MODEL(0)
+  ) dut (
+      .clk(clk),
+      .rst(rst),
+      .start(start),
+      .pixel_data_in(pixel_data_in),
+      .pixel_addr_out(pixel_addr_out),
+      .busy(busy),
+      .done(done),
+      .prediction_out(prediction_out)
+  );
 
-    // Debug signal assignments
-    assign debug_state = dut.state;
-    assign debug_current_layer = dut.current_layer;
-    assign debug_hidden_tile = dut.hidden_tile_index;
-    assign debug_output_tile = dut.output_tile_index;
-    assign debug_vpu_out_1 = dut.vpu_data_out_1;
-    assign debug_vpu_out_2 = dut.vpu_data_out_2;
-    assign debug_vpu_valid_1 = dut.vpu_valid_out_1;
-    assign debug_vpu_valid_2 = dut.vpu_valid_out_2;
-    assign debug_sys_switch = dut.sys_switch_in;
-    assign debug_tpu_rst = dut.tpu_rst;
+  // Debug signal assignments
+  assign debug_state = dut.state;
+  assign debug_current_layer = dut.current_layer;
+  assign debug_hidden_tile = dut.hidden_tile_index;
+  assign debug_output_tile = dut.output_tile_index;
+  assign debug_vpu_out_1 = dut.vpu_data_out_1;
+  assign debug_vpu_out_2 = dut.vpu_data_out_2;
+  assign debug_vpu_valid_1 = dut.vpu_valid_out_1;
+  assign debug_vpu_valid_2 = dut.vpu_valid_out_2;
+  assign debug_sys_switch = dut.sys_switch_in;
+  assign debug_tpu_rst = dut.tpu_rst;
 
 endmodule
+
+`default_nettype wire

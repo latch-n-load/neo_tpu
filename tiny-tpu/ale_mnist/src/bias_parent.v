@@ -1,7 +1,7 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 `default_nettype none
 
-module bias_parent(
+module bias_parent (
     input wire clk,
     input wire rst,
 
@@ -21,27 +21,29 @@ module bias_parent(
     output wire signed [15:0] bias_z_data_out_2
 
 );
-    // Each bias module handles a feature column for a pre-activation matrix.
+  // Each bias module handles a feature column for a pre-activation matrix.
 
-    bias_child column_1 (
-        .clk(clk),
-        .rst(rst),
-        .bias_scalar_in(bias_scalar_in_1),
-        .bias_Z_valid_out(bias_Z_valid_out_1),
-        .bias_sys_data_in(bias_sys_data_in_1),
-        .bias_sys_valid_in(bias_sys_valid_in_1),
-        .bias_z_data_out(bias_z_data_out_1)
-    );
+  bias_child column_1 (
+      .clk(clk),
+      .rst(rst),
+      .bias_scalar_in(bias_scalar_in_1),
+      .bias_Z_valid_out(bias_Z_valid_out_1),
+      .bias_sys_data_in(bias_sys_data_in_1),
+      .bias_sys_valid_in(bias_sys_valid_in_1),
+      .bias_z_data_out(bias_z_data_out_1)
+  );
 
-    bias_child column_2 (
-        .clk(clk),
-        .rst(rst),
-        .bias_scalar_in(bias_scalar_in_2),
-        .bias_Z_valid_out(bias_Z_valid_out_2),
-        .bias_sys_data_in(bias_sys_data_in_2),
-        .bias_sys_valid_in(bias_sys_valid_in_2),
-        .bias_z_data_out(bias_z_data_out_2)
-    );
+  bias_child column_2 (
+      .clk(clk),
+      .rst(rst),
+      .bias_scalar_in(bias_scalar_in_2),
+      .bias_Z_valid_out(bias_Z_valid_out_2),
+      .bias_sys_data_in(bias_sys_data_in_2),
+      .bias_sys_valid_in(bias_sys_valid_in_2),
+      .bias_z_data_out(bias_z_data_out_2)
+  );
 
 
 endmodule
+
+`default_nettype wire
