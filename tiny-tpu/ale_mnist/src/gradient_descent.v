@@ -22,26 +22,26 @@ module gradient_descent (
 
     // updated weight and done signal
     output reg [15:0] value_updated_out,
-    output reg grad_descent_done_out
+    output reg        grad_descent_done_out
 );
 
   wire [15:0] sub_value_out;
-  reg grad_descent_in_reg;
-  reg [15:0] sub_in_a;
+  reg         grad_descent_in_reg;
+  reg  [15:0] sub_in_a;
   wire [15:0] mul_out;
 
   fxp_mul mul_inst (
-      .ina(grad_in),
-      .inb(lr_in),
-      .out(mul_out),
+      .ina     (grad_in),
+      .inb     (lr_in),
+      .out     (mul_out),
       .overflow()
   );
 
   fxp_addsub sub_inst (
-      .ina(sub_in_a),
-      .inb(mul_out),
-      .sub(1'b1),
-      .out(sub_value_out),
+      .ina     (sub_in_a),
+      .inb     (mul_out),
+      .sub     (1'b1),
+      .out     (sub_value_out),
       .overflow()
   );
 
@@ -63,7 +63,7 @@ module gradient_descent (
 
   always @(posedge clk or posedge rst) begin
     if (rst) begin
-      value_updated_out <= 16'b0;
+      value_updated_out     <= 16'b0;
       grad_descent_done_out <= 1'b0;
     end else begin
       grad_descent_done_out <= grad_descent_valid_in;

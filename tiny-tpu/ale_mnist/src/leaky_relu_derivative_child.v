@@ -5,12 +5,12 @@ module leaky_relu_derivative_child (
     input wire clk,
     input wire rst,
 
-    input wire lr_d_valid_in,
+    input wire               lr_d_valid_in,
     input wire signed [15:0] lr_d_data_in,
     input wire signed [15:0] lr_leak_factor_in,
-    input wire signed [15:0] lr_d_H_data_in,  // H data coming through
+    input wire signed [15:0] lr_d_H_data_in,     // H data coming through
 
-    output reg lr_d_valid_out,
+    output reg               lr_d_valid_out,
     output reg signed [15:0] lr_d_data_out
 );
   // fixed point module and storage

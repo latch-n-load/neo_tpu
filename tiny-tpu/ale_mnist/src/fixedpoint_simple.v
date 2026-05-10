@@ -52,16 +52,16 @@ module fxp_mul #(
 
   // Multiply and shift right by fractional bits
   wire signed [(WIIA+WIFA)+(WIIB+WIFB)-1:0] product;
-  wire signed [WOI+WOF-1:0] shifted;
+  wire signed [                WOI+WOF-1:0] shifted;
 
-  assign product = $signed(ina) * $signed(inb);
+  assign product  = $signed(ina) * $signed(inb);
 
   // Align the product to the requested output fractional width.
-  assign shifted = product[(WIFA+WIFB-WOF)+:(WOI+WOF)];
+  assign shifted  = product[(WIFA+WIFB-WOF)+:(WOI+WOF)];
 
   // Check overflow
   assign overflow = 1'b0;  // Simplified - assume no overflow for now
-  assign out = shifted;
+  assign out      = shifted;
 
 endmodule
 

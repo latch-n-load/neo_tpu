@@ -1,6 +1,6 @@
 // ==============================================================================
 // FILE: test_main.cpp
-// Verilator C++ Testbench for MNIST TPU Tiled Classifier
+// Verilator C++ Testbench for MNIST TPU Tiled Classifier (Runtime VPU Check)
 // ==============================================================================
 
 #include <verilated.h>
@@ -10,31 +10,22 @@
 #include <iomanip>
 #include <cstdint>
 #include <cstring>
+#include <vector>
+#include <fstream>
+#include <sstream>
 
 // Simulation parameters
-static const int CLK_PERIOD_PS = 10000;  // 10ns = 10000ps (100 MHz)
+static const int CLK_PERIOD_PS = 10000;  
 static const int PIXELS = 784;
 static const int HIDDEN_NEURONS = 64;
 static const int OUTPUT_NEURONS = 10;
-static const uint64_t MAX_SIM_TIME = 50000000000; // 50ms max (5M cycles)
+static const uint64_t MAX_SIM_TIME = 100000000;
 
 // FSM State names
 static const char* state_names[] = {
-    "IDLE",
-    "RESET_ASSERT",
-    "RESET_RELEASE",
-    "LOAD_INPUT",
-    "LOAD_WEIGHT",
-    "LOAD_BIAS",
-    "START_WEIGHT",
-    "START_WEIGHT_GAP",
-    "START_INPUT",
-    "SWITCH_WEIGHTS",
-    "START_BIAS",
-    "WAIT_OUTPUT",
-    "NEXT_TILE",
-    "ARGMAX",
-    "DONE"
+    "IDLE", "RESET_ASSERT", "RESET_RELEASE", "LOAD_INPUT", "LOAD_WEIGHT", 
+    "LOAD_BIAS", "START_WEIGHT", "START_WEIGHT_GAP", "START_INPUT", 
+    "SWITCH_WEIGHTS", "START_BIAS", "WAIT_OUTPUT", "NEXT_TILE", "ARGMAX", "DONE"
 };
 
 // Globals
@@ -43,177 +34,125 @@ static VerilatedVcdC* tfp;
 static uint64_t sim_time = 0;
 static uint64_t cycle_count = 0;
 
-// Test image (28x28 vertical line pattern)
 static int16_t test_image[PIXELS];
+
+// Expected Math Globals
+std::vector<int16_t> w1_mem;
+std::vector<int16_t> b1_mem;
+std::vector<int16_t> w2_mem;
+std::vector<int16_t> b2_mem;
+std::vector<int16_t> expected_hidden(HIDDEN_NEURONS, 0);
+std::vector<int16_t> expected_logits(OUTPUT_NEURONS, 0);
+
+// ==============================================================================
+// Q8.8 Math Utilities
+// ==============================================================================
+static int16_t sat_add(int16_t a, int16_t b) {
+    int32_t sum = (int32_t)a + (int32_t)b;
+    if (sum > 32767) return 32767;
+    if (sum < -32768) return -32768;
+    return (int16_t)sum;
+}
+
+static int16_t q8_8_mul(int16_t a, int16_t b) {
+    int32_t prod = (int32_t)a * (int32_t)b;
+    int32_t shifted = prod >> 8;
+    return (int16_t)(shifted & 0xFFFF);
+}
+
+// ==============================================================================
+// File Loading
+// ==============================================================================
+static void load_memh(const std::string& filepath, std::vector<int16_t>& mem) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "[ERROR] Could not open " << filepath << std::endl;
+        exit(1);
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty() || line[0] == '/') continue;
+        uint32_t val;
+        std::stringstream ss;
+        ss << std::hex << line;
+        ss >> val;
+        mem.push_back((int16_t)val);
+    }
+    std::cout << "[TB] Loaded " << mem.size() << " elements from " << filepath << std::endl;
+}
+
+// ==============================================================================
+// Compute Golden Reference
+// ==============================================================================
+static void compute_expected_outputs() {
+    std::cout << "[TB] Computing C++ Expected Outputs..." << std::endl;
+    
+    // Layer 1
+    for (int h = 0; h < HIDDEN_NEURONS; h++) {
+        int h_tile = h / 2;
+        int h_rem = h % 2;
+        int16_t acc = 0;
+        for (int p = 0; p < PIXELS; p++) {
+            int w_idx = (h_tile * PIXELS * 2) + (p * 2) + h_rem;
+            acc = sat_add(acc, q8_8_mul(test_image[p], w1_mem[w_idx]));
+            std::cout << "[TB] Current Product: test_image[" << p << "] (" << test_image[p] << ") * w1_mem[" << w_idx << "] = (" << w1_mem[w_idx] << ") = " << q8_8_mul(test_image[p], w1_mem[w_idx]) << std::endl;
+            std::cout << "[TB] Accumulator after adding product: " << acc << std::endl;
+        }
+        acc = sat_add(acc, b1_mem[h]);
+        std::cout << "[TB] Accumulator + bias b1_mem[" << h << "] = " << b1_mem[h] << " = " << acc << std::endl;
+        if (acc < 0) acc = 0; // ReLU
+        expected_hidden[h] = acc;
+    }
+
+    // Layer 2
+    for (int o = 0; o < OUTPUT_NEURONS; o++) {
+        int o_tile = o / 2;
+        int o_rem = o % 2;
+        int16_t acc = 0;
+        for (int h = 0; h < HIDDEN_NEURONS; h++) {
+            int w_idx = (o_tile * HIDDEN_NEURONS * 2) + (h * 2) + o_rem;
+            acc = sat_add(acc, q8_8_mul(expected_hidden[h], w2_mem[w_idx]));
+        }
+        acc = sat_add(acc, b2_mem[o]);
+        expected_logits[o] = acc;
+    }
+}
 
 // ==============================================================================
 // Generate a simple test image
 // ==============================================================================
 static void generate_test_image() {
-    // Initialize to zero (background)
     for (int i = 0; i < PIXELS; i++) {
         test_image[i] = 0;
     }
-    
-    // Draw vertical line in columns 13-14 resembling digit "1"
     for (int row = 4; row < 24; row++) {
-        test_image[row * 28 + 13] = 0x8000; // Q8.8: 128.0
-        test_image[row * 28 + 14] = 0xFF00; // Q8.8: 255.0
+        test_image[row * 28 + 13] = 0x8000; 
+        test_image[row * 28 + 14] = 0xFF00; 
     }
-    
     std::cout << "[TB] Generated test image (vertical line pattern)" << std::endl;
 }
 
 // ==============================================================================
-// Clock toggle
+// Clock & Reset
 // ==============================================================================
 static void toggle_clock() {
     top->clk = !top->clk;
     top->eval();
-    
-    if (tfp) {
-        tfp->dump(sim_time);
-    }
-    
+    if (tfp) tfp->dump(sim_time);
     sim_time += CLK_PERIOD_PS / 2;
-    
-    if (top->clk) {
-        cycle_count++;
-    }
+    if (top->clk) cycle_count++;
 }
 
-// ==============================================================================
-// Apply reset
-// ==============================================================================
 static void apply_reset(int cycles) {
     top->rst = 1;
     top->start = 0;
     top->pixel_data_in = 0;
-    
     for (int i = 0; i < cycles; i++) {
         toggle_clock();
         toggle_clock();
     }
-    
     top->rst = 0;
     std::cout << "[TB] Reset released after " << cycles << " cycles" << std::endl;
-}
-
-// ==============================================================================
-// Get state name string
-// ==============================================================================
-static const char* get_state_name(uint8_t state) {
-    if (state < 15) {
-        return state_names[state];
-    }
-    return "UNKNOWN";
-}
-
-// ==============================================================================
-// State transition logger
-// ==============================================================================
-static uint8_t prev_state = 0;
-static uint8_t prev_layer = 0;
-static uint8_t prev_hidden_tile = 0;
-static uint8_t prev_output_tile = 0;
-static bool prev_busy = false;
-static bool prev_done = false;
-
-static void log_state_changes() {
-    uint8_t state = top->debug_state;
-    uint8_t layer = top->debug_current_layer;
-    uint8_t hidden_tile = top->debug_hidden_tile;
-    uint8_t output_tile = top->debug_output_tile;
-    
-    // State changes
-    if (state != prev_state) {
-        std::cout << "[STATE] Cycle " << std::setw(8) << cycle_count 
-                  << ": " << std::setw(15) << get_state_name(prev_state)
-                  << " -> " << std::setw(15) << get_state_name(state)
-                  << " | Layer=" << (layer ? "L2" : "L1")
-                  << " | HTile=" << (int)hidden_tile 
-                  << " OTile=" << (int)output_tile
-                  << std::endl;
-        prev_state = state;
-    }
-    
-    // Layer changes
-    if (layer != prev_layer) {
-        std::cout << "[LAYER] Cycle " << std::setw(8) << cycle_count 
-                  << ": Switching to " << (layer ? "Layer 2 (Hidden->Output)" : "Layer 1 (Input->Hidden)")
-                  << std::endl;
-        prev_layer = layer;
-    }
-    
-    // Tile changes within same layer
-    if (layer == 0 && hidden_tile != prev_hidden_tile) {
-        std::cout << "[TILE]  Cycle " << std::setw(8) << cycle_count 
-                  << ": Layer 1 Tile " << (int)hidden_tile << " / 32"
-                  << std::endl;
-        prev_hidden_tile = hidden_tile;
-    }
-    if (layer == 1 && output_tile != prev_output_tile) {
-        std::cout << "[TILE]  Cycle " << std::setw(8) << cycle_count 
-                  << ": Layer 2 Tile " << (int)output_tile << " / 5"
-                  << std::endl;
-        prev_output_tile = output_tile;
-    }
-    
-    // Busy/done transitions
-    if (top->busy && !prev_busy) {
-        std::cout << "[DUT]   Cycle " << std::setw(8) << cycle_count 
-                  << ": DUT busy asserted" << std::endl;
-    }
-    if (top->done && !prev_done) {
-        std::cout << "[DUT]   Cycle " << std::setw(8) << cycle_count 
-                  << ": DUT done asserted" << std::endl;
-    }
-    prev_busy = top->busy;
-    prev_done = top->done;
-}
-
-// ==============================================================================
-// VPU output logger
-// ==============================================================================
-static bool prev_vpu_valid_1 = false;
-static bool prev_vpu_valid_2 = false;
-
-static void log_vpu_outputs() {
-    if (top->debug_vpu_valid_1 && !prev_vpu_valid_1) {
-        std::cout << "[VPU]   Cycle " << std::setw(8) << cycle_count 
-                  << ": Output1 = 0x" << std::hex << std::setw(4) << std::setfill('0')
-                  << (uint16_t)top->debug_vpu_out_1 << std::dec << std::setfill(' ')
-                  << " (" << (int16_t)top->debug_vpu_out_1 << ")"
-                  << std::endl;
-    }
-    if (top->debug_vpu_valid_2 && !prev_vpu_valid_2) {
-        std::cout << "[VPU]   Cycle " << std::setw(8) << cycle_count 
-                  << ": Output2 = 0x" << std::hex << std::setw(4) << std::setfill('0')
-                  << (uint16_t)top->debug_vpu_out_2 << std::dec << std::setfill(' ')
-                  << " (" << (int16_t)top->debug_vpu_out_2 << ")"
-                  << std::endl;
-    }
-    prev_vpu_valid_1 = top->debug_vpu_valid_1;
-    prev_vpu_valid_2 = top->debug_vpu_valid_2;
-}
-
-// ==============================================================================
-// Signal edge logger
-// ==============================================================================
-static bool prev_sys_switch = false;
-static bool prev_tpu_rst = false;
-
-static void log_control_signals() {
-    if (top->debug_sys_switch && !prev_sys_switch) {
-        std::cout << "[CTRL]  Cycle " << std::setw(8) << cycle_count 
-                  << ": sys_switch pulsed (weights latched)" << std::endl;
-    }
-    if (top->debug_tpu_rst && !prev_tpu_rst) {
-        std::cout << "[CTRL]  Cycle " << std::setw(8) << cycle_count 
-                  << ": TPU reset asserted" << std::endl;
-    }
-    prev_sys_switch = top->debug_sys_switch;
-    prev_tpu_rst = top->debug_tpu_rst;
 }
 
 // ==============================================================================
@@ -221,16 +160,11 @@ static void log_control_signals() {
 // ==============================================================================
 int main(int argc, char** argv) {
     Verilated::commandArgs(argc, argv);
-    
-    // Create DUT instance
     top = new Vmnist_tpu_tiled_classifier_tb;
     
-    // Enable waveform tracing if --trace argument provided
     bool trace_enabled = false;
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--trace") == 0) {
-            trace_enabled = true;
-        }
+        if (strcmp(argv[i], "--trace") == 0) trace_enabled = true;
     }
     
     if (trace_enabled) {
@@ -241,106 +175,147 @@ int main(int argc, char** argv) {
         std::cout << "[TB] Waveform tracing enabled -> mnist_tpu_classifier.vcd" << std::endl;
     }
     
-    // Generate test image
+    // 1. Generate Image & Load Weights
     generate_test_image();
+    load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w1_tiled_q8_8.memh", w1_mem);
+    load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b1_q8_8.memh", b1_mem);
+    load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w2_tiled_q8_8.memh", w2_mem);
+    load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b2_q8_8.memh", b2_mem);
     
-    // Initialize inputs
+    // 2. Compute C++ Golden Reference
+    compute_expected_outputs();
+
     top->clk = 0;
     top->rst = 1;
     top->start = 0;
     top->pixel_data_in = 0;
-    
-    // Evaluate initial state
     top->eval();
     
-    std::cout << "============================================" << std::endl;
-    std::cout << "MNIST TPU Tiled Classifier - Verilator Testbench" << std::endl;
-    std::cout << "============================================" << std::endl;
+    apply_reset(10); 
     
-    // Apply reset
-    apply_reset(10);
-    
-    // Pulse start signal
     std::cout << "[TB] Asserting start pulse..." << std::endl;
-    toggle_clock();
-    top->start = 1;
-    toggle_clock();
-    toggle_clock();
-    top->start = 0;
-    toggle_clock();
-    std::cout << "[TB] Start pulse complete" << std::endl;
+    toggle_clock(); 
+    top->start = 1; 
+    toggle_clock(); 
+    toggle_clock(); 
+    top->start = 0; 
+    toggle_clock(); 
     
-    bool all_pixels_sent = false;
-    
-    // Main simulation loop
+    // Runtime Checking Variables
+    int hidden_checked_count = 0;
+    int logits_checked_count = 0;
+    int hidden_errors = 0;
+    int logit_errors = 0;
+    bool inference_complete = false;
+
     while (sim_time < MAX_SIM_TIME) {
         toggle_clock();
         
-        // Log state and signals on posedge
         if (top->clk) {
-            log_state_changes();
-            log_vpu_outputs();
-            log_control_signals();
-            
             // Feed pixels when DUT is loading inputs for Layer 1
-            if (top->debug_state == 3 && top->debug_current_layer == 0) { // STATE_LOAD_INPUT
+            if (top->debug_state == 3 && top->debug_current_layer == 0) { 
                 uint16_t addr = top->pixel_addr_out;
-                if (addr < PIXELS) {
-                    top->pixel_data_in = test_image[addr];
-                    if (addr == 0 || addr < 10 || addr % 100 == 0) {
-                        std::cout << "[PIX]   Cycle " << std::setw(8) << cycle_count 
-                                  << ": Pixel[" << std::setw(3) << addr 
-                                  << "] = 0x" << std::hex << std::setw(4) << std::setfill('0')
-                                  << (uint16_t)test_image[addr] << std::dec << std::setfill(' ')
-                                  << std::endl;
+                if (addr < PIXELS) top->pixel_data_in = test_image[addr];
+            }
+
+            // ------------------------------------------------------------------
+            // 3. RUNTIME VPU STREAM CHECKING (Bypass DONE signal)
+            // ------------------------------------------------------------------
+            uint8_t current_layer = top->debug_current_layer;
+
+            // Check Channel 1
+            if (top->debug_vpu_valid_1) {
+                int16_t hw_val = (int16_t)top->debug_vpu_out_1;
+                if (current_layer == 0) {
+                    if (hidden_checked_count < HIDDEN_NEURONS) {
+                        int16_t exp_val = expected_hidden[hidden_checked_count];
+                        if (hw_val != exp_val) {
+                            if (hidden_errors < 10) std::cout << "[FAIL] L1 Hidden[" << hidden_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            hidden_errors++;
+                        }
+                        hidden_checked_count++;
                     }
-                    if (addr == PIXELS - 1) {
-                        all_pixels_sent = true;
+                } else {
+                    if (logits_checked_count < OUTPUT_NEURONS) {
+                        int16_t exp_val = expected_logits[logits_checked_count];
+                        if (hw_val != exp_val) {
+                            if (logit_errors < 10) std::cout << "[FAIL] L2 Logit[" << logits_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            logit_errors++;
+                        }
+                        logits_checked_count++;
                     }
                 }
             }
-        }
-        
-        // Check for completion
-        if (top->done) {
-            std::cout << std::endl;
-            std::cout << "============================================" << std::endl;
-            std::cout << "[RESULT] Inference Complete!" << std::endl;
-            std::cout << "[RESULT] Predicted Digit: " << (int)top->prediction_out << std::endl;
-            std::cout << "[RESULT] Total Cycles: " << cycle_count << std::endl;
-            std::cout << "[RESULT] Simulation Time: " << sim_time / 1000 << " ns" << std::endl;
-            std::cout << "============================================" << std::endl;
-            break;
-        }
-        
-        // Timeout check
-        if (sim_time >= MAX_SIM_TIME) {
-            std::cout << std::endl;
-            std::cout << "============================================" << std::endl;
-            std::cout << "[ERROR] Timeout! Inference took too long." << std::endl;
-            std::cout << "[ERROR] Current state: " << get_state_name(top->debug_state) << std::endl;
-            std::cout << "[ERROR] Cycles: " << cycle_count << std::endl;
-            std::cout << "[ERROR] Layer: " << (top->debug_current_layer ? "L2" : "L1") << std::endl;
-            std::cout << "[ERROR] HiddenTile: " << (int)top->debug_hidden_tile << std::endl;
-            std::cout << "[ERROR] OutputTile: " << (int)top->debug_output_tile << std::endl;
-            std::cout << "============================================" << std::endl;
-            break;
+
+            // Check Channel 2
+            if (top->debug_vpu_valid_2) {
+                int16_t hw_val = (int16_t)top->debug_vpu_out_2;
+                if (current_layer == 0) {
+                    if (hidden_checked_count < HIDDEN_NEURONS) {
+                        int16_t exp_val = expected_hidden[hidden_checked_count];
+                        if (hw_val != exp_val) {
+                            if (hidden_errors < 10) std::cout << "[FAIL] L1 Hidden[" << hidden_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            hidden_errors++;
+                        }
+                        hidden_checked_count++;
+                    }
+                } else {
+                    if (logits_checked_count < OUTPUT_NEURONS) {
+                        int16_t exp_val = expected_logits[logits_checked_count];
+                        if (hw_val != exp_val) {
+                            if (logit_errors < 10) std::cout << "[FAIL] L2 Logit[" << logits_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            logit_errors++;
+                        }
+                        logits_checked_count++;
+                    }
+                }
+            }
+
+            // Check if we have collected all expected data
+            if (hidden_checked_count >= HIDDEN_NEURONS && logits_checked_count >= OUTPUT_NEURONS) {
+                inference_complete = true;
+                break; // Exit the while loop manually!
+            }
         }
     }
     
-    // Add extra cycles for observation
-    for (int i = 0; i < 10; i++) {
+    std::cout << "\n============================================" << std::endl;
+    if (inference_complete) {
+        std::cout << "[RESULT] All expected VPU outputs harvested successfully!" << std::endl;
+    } else {
+        std::cout << "[RESULT] TIMEOUT! Failed to harvest all VPU outputs." << std::endl;
+        std::cout << "         Harvested " << hidden_checked_count << "/" << HIDDEN_NEURONS << " Hidden Neurons" << std::endl;
+        std::cout << "         Harvested " << logits_checked_count << "/" << OUTPUT_NEURONS << " Logits" << std::endl;
+    }
+    
+    std::cout << "--------------------------------------------" << std::endl;
+    std::cout << "Hidden Errors: " << hidden_errors << " / " << hidden_checked_count << std::endl;
+    std::cout << "Logit Errors:  " << logit_errors << " / " << logits_checked_count << std::endl;
+    
+    // Predict manually from our collected logits if we got them all
+    if (logits_checked_count == OUTPUT_NEURONS) {
+        int best_idx = 0;
+        int16_t best_val = expected_logits[0];
+        for(int i = 1; i < OUTPUT_NEURONS; i++){
+            if(expected_logits[i] > best_val){
+                best_val = expected_logits[i];
+                best_idx = i;
+            }
+        }
+        std::cout << "Expected Digit (C++ Argmax): " << best_idx << std::endl;
+    }
+    
+    std::cout << "Total Cycles: " << cycle_count << std::endl;
+    std::cout << "============================================\n" << std::endl;
+    
+    // Add extra cycles for observation in the waveform
+    for (int i = 0; i < 20; i++) {
         toggle_clock();
         toggle_clock();
     }
     
-    // Cleanup
-    if (tfp) {
-        tfp->close();
-        delete tfp;
-    }
+    if (tfp) { tfp->close(); delete tfp; }
     delete top;
     
-    std::cout << "[TB] Simulation completed." << std::endl;
     return 0;
 }

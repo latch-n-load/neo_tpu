@@ -29,7 +29,20 @@ VERILATOR_FLAGS = -Wall \
                   -CFLAGS "-O3 -march=native" \
                   --top-module mnist_tpu_tiled_classifier_tb
 
-# Verible lint rules (Defined individually to prevent parsing errors)
+
+# Verible format rules for tabular alignment
+VERIBLE_FORMAT_FLAGS = \
+    --module_net_variable_alignment=align \
+    --assignment_statement_alignment=align \
+    --port_declarations_alignment=align \
+    --formal_parameters_alignment=align \
+    --class_member_variable_alignment=align \
+    --struct_union_members_alignment=align \
+    --case_items_alignment=align \
+    --named_port_alignment=align \
+    --named_parameter_alignment=align
+
+# Verible lint rules
 VERIBLE_RULES = \
     --rules=always-comb \
     --rules=always-ff-non-blocking \
@@ -51,28 +64,73 @@ VERIBLE_RULES = \
     --rules=void-cast \
     --rules=always-comb-blocking
 
-# Waive certain rules for legacy or test files
-VERIBLE_WAIVE = --rules=-line-length
+# Disable some strict rules
+VERIBLE_WAIVE = \
+    --rules=-line-length \
+    --rules=-macro-name-style \
+    --rules=-signal-name-style
 
-# File Discoveries
-SRCS = $(wildcard $(SOURCE_DIR)/*.v)
-TEST_SRCS = $(wildcard $(TEST_DIR)/*.v) $(wildcard $(TEST_DIR)/*.cpp)
-ALL_VERILOG = $(wildcard $(SOURCE_DIR)/*.v) $(wildcard $(TEST_DIR)/*.v)
+# Source files
+VERILOG_SOURCES = $(SOURCE_DIR)/pe.v \
+					$(SOURCE_DIR)/leaky_relu_child.v \
+					$(SOURCE_DIR)/leaky_relu_parent.v \
+					$(SOURCE_DIR)/leaky_relu_derivative_child.v \
+					$(SOURCE_DIR)/leaky_relu_derivative_parent.v \
+					$(SOURCE_DIR)/systolic.v \
+					$(SOURCE_DIR)/bias_child.v \
+					$(SOURCE_DIR)/bias_parent.v \
+					$(SOURCE_DIR)/fixedpoint_simple.v \
+					$(SOURCE_DIR)/control_unit.v \
+					$(SOURCE_DIR)/unified_buffer.v \
+					$(SOURCE_DIR)/vpu.v \
+					$(SOURCE_DIR)/loss_parent.v \
+					$(SOURCE_DIR)/loss_child.v \
+					$(SOURCE_DIR)/tpu_mnist.v \
+					$(SOURCE_DIR)/gradient_descent.v \
+					$(SOURCE_DIR)/mnist_tpu_tiled_classifier.v
 
-# Color Codes for Pretty Output
-BLUE = \033[1;34m
-GREEN = \033[1;32m
-YELLOW = \033[1;33m
-RED = \033[1;31m
+# Testbench files
+VERILOG_TB = $(TEST_DIR)/mnist_tpu_tiled_classifier_tb.v
+CPP_TB = $(TEST_DIR)/test_main.cpp
+
+# All Verilog files
+ALL_VERILOG = $(VERILOG_SOURCES) $(VERILOG_TB)
+
+# Colors for output
+RED = \033[0;31m
+GREEN = \033[0;32m
+YELLOW = \033[0;33m
+BLUE = \033[0;34m
 NC = \033[0m # No Color
 
-# ==============================================================================
-# Default target - Runs full styling, patching, compilation, and simulation
-# ==============================================================================
-all: lint format fix fix-verilator build wave
+.PHONY: all clean run wave lint format fix help distclean
 
 # ==============================================================================
-# Step 1: Linting
+# Default target
+# ==============================================================================
+all: lint format fix build
+
+# ==============================================================================
+# Help
+# ==============================================================================
+help:
+	@echo "$(BLUE)MNIST TPU Tiled Classifier - Build System$(NC)"
+	@echo ""
+	@echo "$(GREEN)Available targets:$(NC)"
+	@echo "  $(YELLOW)make help$(NC)     - Show this help message"
+	@echo "  $(YELLOW)make all$(NC)      - Lint, format, fix, and build (default)"
+	@echo "  $(YELLOW)make lint$(NC)     - Run Verible lint check only"
+	@echo "  $(YELLOW)make format$(NC)   - Auto-format with Verible"
+	@echo "  $(YELLOW)make fix$(NC)      - Apply Verible auto-fixes"
+	@echo "  $(YELLOW)make build$(NC)    - Build with Verilator (no linting)"
+	@echo "  $(YELLOW)make run$(NC)      - Run simulation (no trace)"
+	@echo "  $(YELLOW)make wave$(NC)     - Run simulation with waveform trace"
+	@echo "  $(YELLOW)make view$(NC)     - Open waveforms in GTKWave"
+	@echo "  $(YELLOW)make clean$(NC)    - Clean all build artifacts"
+	@echo ""
+
+# ==============================================================================
+# Verible lint check
 # ==============================================================================
 lint:
 	@echo "$(BLUE)========================================$(NC)"
@@ -83,35 +141,46 @@ lint:
 	@echo "$(GREEN)Verible lint check complete$(NC)"
 
 # ==============================================================================
-# Step 2: Code Formatting
+# Strict lint (fails on warnings)
+# ==============================================================================
+lint-strict:
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  Verible Strict Lint Check$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	@$(VERIBLE) $(VERIBLE_RULES) $(VERIBLE_WAIVE) --fatal_errors $(ALL_VERILOG)
+	@echo "$(GREEN)Verible strict lint passed$(NC)"
+
+# ==============================================================================
+# Auto-format with Verible
 # ==============================================================================
 format:
 	@echo "$(BLUE)========================================$(NC)"
-	@echo "$(BLUE)  Verible Code Formatting$(NC)"
+	@echo "$(BLUE)  Verible Auto-Format$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
 	@for f in $(ALL_VERILOG); do \
 		echo "$(YELLOW)Formatting $$f...$(NC)"; \
-		$(VERIBLE_FORMAT) --inplace $$f; \
+		$(VERIBLE_FORMAT) $(VERIBLE_FORMAT_FLAGS) --inplace $$f; \
 	done
 	@echo ""
 	@echo "$(GREEN)Formatting complete$(NC)"
 
 # ==============================================================================
-# Step 3: Apply Verible Auto-Fixes
+# Apply Verible auto-fixes
 # ==============================================================================
 fix:
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)  Verible Auto-Fix$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(YELLOW)Scanning for fixable issues...$(NC)"
+	@# Capture linter output. We use 2> to grab the patch suggestions. 
 	@$(VERIBLE) $(VERIBLE_RULES) $(VERIBLE_WAIVE) --patch_context_lines=3 $(ALL_VERILOG) 2> verible_fixes.patch || true
 	@if [ -s verible_fixes.patch ]; then \
-		echo "$(YELLOW)Found fixes. Applying automatically...$(NC)"; \
+		echo "$(YELLOW)Found fixes. Applying...$(NC)"; \
 		yes | verible-patch-tool apply-pick verible_fixes.patch; \
 		if [ $$? -eq 0 ]; then \
 			echo "$(GREEN)Fixes applied successfully.$(NC)"; \
 		else \
-			echo "$(RED)Error: verible-patch-tool failed during apply-pick.$(NC)"; \
+			echo "$(RED)Error: verible-patch-tool failed.$(NC)"; \
 			rm -f verible_fixes.patch; exit 1; \
 		fi; \
 	else \
@@ -121,7 +190,7 @@ fix:
 	@echo ""
 
 # ==============================================================================
-# Step 4: Fix common Verilator compatibility issues
+# Fix common Verilator compatibility issues
 # ==============================================================================
 fix-verilator:
 	@echo "$(BLUE)========================================$(NC)"
@@ -129,11 +198,17 @@ fix-verilator:
 	@echo "$(BLUE)========================================$(NC)"
 	@for f in $(ALL_VERILOG); do \
 		echo "$(YELLOW)Fixing $$f for Verilator...$(NC)"; \
+		\
+		# Remove synthesis translate_off/on comments; \
 		sed -i 's/\/\/\s*synthesis\s*translate_off/\/\/ synthesis translate_off removed/g' $$f; \
 		sed -i 's/\/\/\s*synthesis\s*translate_on/\/\/ synthesis translate_on removed/g' $$f; \
+		\
+		# Ensure default_nettype none at top; \
 		if ! grep -q '`default_nettype none' $$f; then \
 			sed -i '1i `default_nettype none' $$f; \
 		fi; \
+		\
+		# Add default_nettype wire at end if not present; \
 		if ! grep -q '`default_nettype wire' $$f; then \
 			echo '' >> $$f; \
 			echo '`default_nettype wire' >> $$f; \
@@ -143,47 +218,78 @@ fix-verilator:
 	@echo "$(GREEN)Verilator compatibility fixes applied$(NC)"
 
 # ==============================================================================
-# Step 5: Build Verilator Model
+# Verilator lint only
 # ==============================================================================
-build:
+verilator-lint:
 	@echo "$(BLUE)========================================$(NC)"
-	@echo "$(BLUE)  Building Verilator Model$(NC)"
+	@echo "$(BLUE)  Verilator Lint Check$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
-	$(VERILATOR) $(VERILATOR_FLAGS) $(SRCS) $(TEST_SRCS)
-	@echo ""
-	@echo "$(GREEN)Build complete: $(EXECUTABLE)$(NC)"
+	@$(VERILATOR) --lint-only -Wall $(ALL_VERILOG)
+	@echo "$(GREEN)Verilator lint passed$(NC)"
 
 # ==============================================================================
-# Step 6: Run simulation and generate waveform file
+# Build with Verilator
 # ==============================================================================
-wave:
+build: $(EXECUTABLE)
+
+$(EXECUTABLE): $(ALL_VERILOG) $(CPP_TB)
 	@echo "$(BLUE)========================================$(NC)"
-	@echo "$(BLUE)  Running Simulation & Generating Wave$(NC)"
+	@echo "$(BLUE)  Verilator Build$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
-	@if [ -f $(EXECUTABLE) ]; then \
-		$(EXECUTABLE) +trace; \
-		echo "$(GREEN)Simulation complete. Waveform generated as mnist_tpu_classifier.vcd$(NC)"; \
-	else \
-		echo "$(RED)Error: Executable not found. Please run 'make build' first.$(NC)"; \
-		exit 1; \
-	fi
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		$(ALL_VERILOG) $(CPP_TB) \
+		-o $(EXEC_NAME)
 	@echo ""
+	@echo "$(GREEN)Build successful: $(EXECUTABLE)$(NC)"
 
 # ==============================================================================
-# Optional step: View waves in GTKWave
+# Quick build (skip lint/format)
+# ==============================================================================
+quick: $(EXECUTABLE)
+
+# ==============================================================================
+# Run simulation without trace
+# ==============================================================================
+run: $(EXECUTABLE)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  Running Simulation$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	./$(OUTPUT_DIR)/$(EXECUTABLE)
+
+# ==============================================================================
+# Run simulation with waveform trace
+# ==============================================================================
+wave: $(EXECUTABLE)
+	@echo "$(BLUE)========================================$(NC)"
+	@echo "$(BLUE)  Running Simulation with Trace$(NC)"
+	@echo "$(BLUE)========================================$(NC)"
+	./$(EXECUTABLE) --trace
+	@echo "$(GREEN)Waveform saved to mnist_tpu_classifier.vcd$(NC)"
+
+# ==============================================================================
+# View waveforms
 # ==============================================================================
 view:
-	@echo "$(BLUE)Opening waveform in GTKWave...$(NC)"
 	@if [ -f mnist_tpu_classifier.vcd ]; then \
 		gtkwave mnist_tpu_classifier.vcd & \
 	else \
-		echo "$(RED)Error: mnist_tpu_classifier.vcd not found. Run 'make wave' first.$(NC)"; \
+		echo "$(RED)No waveform file found. Run 'make wave' first.$(NC)"; \
 	fi
 
 # ==============================================================================
-# Pipeline targets for segmented runs
+# Full pipeline: format -> lint -> fix -> fix-verilator -> build
 # ==============================================================================
-pipeline: lint format fix fix-verilator build
+pipeline:
+	@$(MAKE) format
+	@$(MAKE) lint
+	@$(MAKE) fix
+	@$(MAKE) fix-verilator
+	@$(MAKE) build
+	@echo ""
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(GREEN)  Full Pipeline Complete!$(NC)"
+	@echo "$(GREEN)========================================$(NC)"
+	@echo "$(YELLOW)Run 'make run' or 'make wave' to simulate$(NC)"
 
 # ==============================================================================
 # Check tool availability
@@ -210,7 +316,7 @@ clean:
 	@echo "$(YELLOW)Cleaning build artifacts...$(NC)"
 	rm -rf $(OUTPUT_DIR)
 	rm -f mnist_tpu_classifier.vcd
-	rm -f verible_fixes.patch
+	rm -f verible_fixes.txt
 	rm -f *.bak
 	@echo "$(GREEN)Clean complete$(NC)"
 
@@ -218,8 +324,7 @@ clean:
 # Deep clean (including Verilator cache)
 # ==============================================================================
 distclean: clean
-	@echo "$(YELLOW)Performing deep clean...$(NC)"
-	rm -rf $(OUTPUT_DIR)
+	@echo "$(YELLOW)Deep cleaning...$(NC)"
+	rm -rf obj_dir_*
+	rm -f .verilator_cache
 	@echo "$(GREEN)Deep clean complete$(NC)"
-
-.PHONY: all lint format fix fix-verilator build wave view clean distclean check-tools pipeline

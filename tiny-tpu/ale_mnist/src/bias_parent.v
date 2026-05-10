@@ -24,23 +24,23 @@ module bias_parent (
   // Each bias module handles a feature column for a pre-activation matrix.
 
   bias_child column_1 (
-      .clk(clk),
-      .rst(rst),
-      .bias_scalar_in(bias_scalar_in_1),
-      .bias_Z_valid_out(bias_Z_valid_out_1),
-      .bias_sys_data_in(bias_sys_data_in_1),
+      .clk              (clk),
+      .rst              (rst),
+      .bias_scalar_in   (bias_scalar_in_1),
+      .bias_Z_valid_out (bias_Z_valid_out_1),
+      .bias_sys_data_in (bias_sys_data_in_1),
       .bias_sys_valid_in(bias_sys_valid_in_1),
-      .bias_z_data_out(bias_z_data_out_1)
+      .bias_z_data_out  (bias_z_data_out_1)
   );
 
   bias_child column_2 (
-      .clk(clk),
-      .rst(rst),
-      .bias_scalar_in(bias_scalar_in_2),
-      .bias_Z_valid_out(bias_Z_valid_out_2),
-      .bias_sys_data_in(bias_sys_data_in_2),
+      .clk              (clk),
+      .rst              (rst),
+      .bias_scalar_in   (bias_scalar_in_2),
+      .bias_Z_valid_out (bias_Z_valid_out_2),
+      .bias_sys_data_in (bias_sys_data_in_2),
       .bias_sys_valid_in(bias_sys_valid_in_2),
-      .bias_z_data_out(bias_z_data_out_2)
+      .bias_z_data_out  (bias_z_data_out_2)
   );
 
 

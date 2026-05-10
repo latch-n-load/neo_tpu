@@ -28,13 +28,13 @@
 `default_nettype none
 
 module mnist_tpu_tiled_classifier #(
-    parameter integer PIXELS = 784,
-    parameter integer PIXEL_ADDR_WIDTH = 10,
-    parameter integer HIDDEN_NEURONS = 64,
-    parameter integer HIDDEN_ADDR_WIDTH = 6,
-    parameter integer OUTPUT_NEURONS = 10,
-    parameter integer OUTPUT_ADDR_WIDTH = 4,
-    parameter integer TILE_WIDTH = 2,
+    parameter integer PIXELS               = 784,
+    parameter integer PIXEL_ADDR_WIDTH     = 10,
+    parameter integer HIDDEN_NEURONS       = 64,
+    parameter integer HIDDEN_ADDR_WIDTH    = 6,
+    parameter integer OUTPUT_NEURONS       = 10,
+    parameter integer OUTPUT_ADDR_WIDTH    = 4,
+    parameter integer TILE_WIDTH           = 2,
     // Massive Unified Buffer to hold full inputs, weights, and biases simultaneously
     parameter integer UNIFIED_BUFFER_WIDTH = 4096,
 
@@ -61,21 +61,21 @@ module mnist_tpu_tiled_classifier #(
   localparam integer OUTPUT_TILES = (OUTPUT_NEURONS + TILE_WIDTH - 1) / TILE_WIDTH;
 
   // FSM State Definitions
-  localparam [4:0] STATE_IDLE = 5'd0;
-  localparam [4:0] STATE_RESET_ASSERT = 5'd1;
-  localparam [4:0] STATE_RESET_RELEASE = 5'd2;
-  localparam [4:0] STATE_LOAD_INPUT = 5'd3;  // Load X or H1 into UB
-  localparam [4:0] STATE_LOAD_WEIGHT = 5'd4;  // Load W1 or W2 into UB
-  localparam [4:0] STATE_LOAD_BIAS = 5'd5;  // Load B1 or B2 into UB
-  localparam [4:0] STATE_START_WEIGHT = 5'd6;  // Stream Weights -> Systolic Array
-  localparam [4:0] STATE_START_WEIGHT_GAP = 5'd7;
-  localparam [4:0] STATE_START_INPUT = 5'd8;  // Stream Inputs -> Systolic Array
-  localparam [4:0] STATE_SWITCH_WEIGHTS = 5'd9;  // Latch weights in Array
-  localparam [4:0] STATE_START_BIAS = 5'd10;  // Stream Biases -> VPU Hardware
-  localparam [4:0] STATE_WAIT_OUTPUT = 5'd11;  // Poll VPU for final valid outputs
-  localparam [4:0] STATE_NEXT_TILE = 5'd12;
-  localparam [4:0] STATE_ARGMAX = 5'd13;
-  localparam [4:0] STATE_DONE = 5'd14;
+  localparam [4:0] STATE_IDLE = 5'd0;  // 0 - Waiting for start signal
+  localparam [4:0] STATE_RESET_ASSERT = 5'd1; // 1 - Assert reset to clear TPU state before starting new inference
+  localparam [4:0] STATE_RESET_RELEASE = 5'd2; // 2 - Release reset and initialize indices for new inference sequence
+  localparam [4:0] STATE_LOAD_INPUT = 5'd3;  // 3 - Load X or H1 into UB
+  localparam [4:0] STATE_LOAD_WEIGHT = 5'd4;  // 4 - Load W1 or W2 into UB
+  localparam [4:0] STATE_LOAD_BIAS = 5'd5;  // 5 - Load B1 or B2 into UB
+  localparam [4:0] STATE_START_WEIGHT = 5'd6;  // 6 - Stream Weights -> Systolic Array
+  localparam [4:0] STATE_START_WEIGHT_GAP = 5'd7; // 7 - Gap state to ensure weights are latched before streaming inputs
+  localparam [4:0] STATE_START_INPUT = 5'd8;  // 8 - Stream Inputs -> Systolic Array
+  localparam [4:0] STATE_SWITCH_WEIGHTS = 5'd9;  // 9 - Latch weights in Array
+  localparam [4:0] STATE_START_BIAS = 5'd10;  // 10 - Stream Biases -> VPU Hardware
+  localparam [4:0] STATE_WAIT_OUTPUT = 5'd11;  // 11 - Poll VPU for final valid outputs
+  localparam [4:0] STATE_NEXT_TILE = 5'd12; // 12 - Move to next tile of weights/activations or switch layers
+  localparam [4:0] STATE_ARGMAX = 5'd13; // 13 - Compute Argmax on final logits to determine predicted digit
+  localparam [4:0] STATE_DONE = 5'd14;  // 14 - Inference complete, wait for next start signal
 
   reg [4:0] state;
   reg current_layer;  // 0 = Layer 1 (Input->Hidden), 1 = Layer 2 (Hidden->Output)
@@ -180,50 +180,50 @@ module mnist_tpu_tiled_classifier #(
       .SYSTOLIC_ARRAY_WIDTH(2),
       .UNIFIED_BUFFER_WIDTH(UNIFIED_BUFFER_WIDTH)
   ) tpu_inst (
-      .clk(clk),
-      .rst(tpu_rst),
-      .ub_wr_host_data_in_0(ub_wr_host_data_in_0),
-      .ub_wr_host_data_in_1(ub_wr_host_data_in_1),
+      .clk                  (clk),
+      .rst                  (tpu_rst),
+      .ub_wr_host_data_in_0 (ub_wr_host_data_in_0),
+      .ub_wr_host_data_in_1 (ub_wr_host_data_in_1),
       .ub_wr_host_valid_in_0(ub_wr_host_valid_in_0),
       .ub_wr_host_valid_in_1(ub_wr_host_valid_in_1),
-      .ub_rd_start_in(ub_rd_start_in),
-      .ub_rd_transpose(ub_rd_transpose),
-      .ub_ptr_select(ub_ptr_select),
-      .ub_rd_addr_in(ub_rd_addr_in),
-      .ub_rd_row_size(ub_rd_row_size),
-      .ub_rd_col_size(ub_rd_col_size),
-      .learning_rate_in(16'h0001),
+      .ub_rd_start_in       (ub_rd_start_in),
+      .ub_rd_transpose      (ub_rd_transpose),
+      .ub_ptr_select        (ub_ptr_select),
+      .ub_rd_addr_in        (ub_rd_addr_in),
+      .ub_rd_row_size       (ub_rd_row_size),
+      .ub_rd_col_size       (ub_rd_col_size),
+      .learning_rate_in     (16'h0001),
 
       // Dynamically fed from FSM to turn VPU features on/off
       .vpu_data_pathway(active_vpu_mode),
 
-      .sys_switch_in(sys_switch_in),
-      .vpu_leak_factor_in(16'h0003),  // Standard leaky ReLU constant
+      .sys_switch_in              (sys_switch_in),
+      .vpu_leak_factor_in         (16'h0003),                  // Standard leaky ReLU constant
       .inv_batch_size_times_two_in(16'h0000),
-      .sys_data_out_21(sys_data_out_21),
-      .sys_data_out_22(sys_data_out_22),
-      .sys_valid_out_21(sys_valid_out_21),
-      .sys_valid_out_22(sys_valid_out_22),
-      .vpu_data_out_1(vpu_data_out_1),
-      .vpu_data_out_2(vpu_data_out_2),
-      .vpu_valid_out_1(vpu_valid_out_1),
-      .vpu_valid_out_2(vpu_valid_out_2),
-      .ub_rd_input_data_out_0(ub_rd_input_data_out_0),
-      .ub_rd_input_data_out_1(ub_rd_input_data_out_1),
-      .ub_rd_input_valid_out_0(ub_rd_input_valid_out_0),
-      .ub_rd_input_valid_out_1(ub_rd_input_valid_out_1),
-      .ub_rd_weight_data_out_0(ub_rd_weight_data_out_0),
-      .ub_rd_weight_data_out_1(ub_rd_weight_data_out_1),
-      .ub_rd_weight_valid_out_0(ub_rd_weight_valid_out_0),
-      .ub_rd_weight_valid_out_1(ub_rd_weight_valid_out_1),
-      .ub_rd_bias_data_out_0(ub_rd_bias_data_out_0),
-      .ub_rd_bias_data_out_1(ub_rd_bias_data_out_1),
-      .ub_rd_Y_data_out_0(ub_rd_Y_data_out_0),
-      .ub_rd_Y_data_out_1(ub_rd_Y_data_out_1),
-      .ub_rd_H_data_out_0(ub_rd_H_data_out_0),
-      .ub_rd_H_data_out_1(ub_rd_H_data_out_1),
-      .ub_rd_col_size_out(ub_rd_col_size_out),
-      .ub_rd_col_size_valid_out(ub_rd_col_size_valid_out)
+      .sys_data_out_21            (sys_data_out_21),
+      .sys_data_out_22            (sys_data_out_22),
+      .sys_valid_out_21           (sys_valid_out_21),
+      .sys_valid_out_22           (sys_valid_out_22),
+      .vpu_data_out_1             (vpu_data_out_1),
+      .vpu_data_out_2             (vpu_data_out_2),
+      .vpu_valid_out_1            (vpu_valid_out_1),
+      .vpu_valid_out_2            (vpu_valid_out_2),
+      .ub_rd_input_data_out_0     (ub_rd_input_data_out_0),
+      .ub_rd_input_data_out_1     (ub_rd_input_data_out_1),
+      .ub_rd_input_valid_out_0    (ub_rd_input_valid_out_0),
+      .ub_rd_input_valid_out_1    (ub_rd_input_valid_out_1),
+      .ub_rd_weight_data_out_0    (ub_rd_weight_data_out_0),
+      .ub_rd_weight_data_out_1    (ub_rd_weight_data_out_1),
+      .ub_rd_weight_valid_out_0   (ub_rd_weight_valid_out_0),
+      .ub_rd_weight_valid_out_1   (ub_rd_weight_valid_out_1),
+      .ub_rd_bias_data_out_0      (ub_rd_bias_data_out_0),
+      .ub_rd_bias_data_out_1      (ub_rd_bias_data_out_1),
+      .ub_rd_Y_data_out_0         (ub_rd_Y_data_out_0),
+      .ub_rd_Y_data_out_1         (ub_rd_Y_data_out_1),
+      .ub_rd_H_data_out_0         (ub_rd_H_data_out_0),
+      .ub_rd_H_data_out_1         (ub_rd_H_data_out_1),
+      .ub_rd_col_size_out         (ub_rd_col_size_out),
+      .ub_rd_col_size_valid_out   (ub_rd_col_size_valid_out)
   );
 
   // Helper function to determine how many outputs are active in the current tile, based on remaining neurons
@@ -244,34 +244,34 @@ module mnist_tpu_tiled_classifier #(
   always @(posedge clk or posedge rst) begin
     if (rst) begin
       // Reset all internal state and outputs
-      state <= STATE_IDLE;
-      current_layer <= 1'b0;
-      hidden_tile_index <= {HIDDEN_ADDR_WIDTH{1'b0}};
-      output_tile_index <= {OUTPUT_ADDR_WIDTH{1'b0}};
-      l1_input_index <= {PIXEL_ADDR_WIDTH{1'b0}};
-      l2_input_index <= {HIDDEN_ADDR_WIDTH{1'b0}};
-      weight_load_index <= 16'd0;
-      bias_load_index <= 16'd0;
-      active_tile_outputs <= 16'd0;
-      output_seen_0 <= 1'b0;
-      output_seen_1 <= 1'b0;
-      active_vpu_mode <= 4'b0000;
-      tpu_rst <= 1'b1;  // Reset TPU (active high)
-      busy <= 1'b0;
-      done <= 1'b0;
-      prediction_out <= 4'd0;
+      state                 <= STATE_IDLE;
+      current_layer         <= 1'b0;
+      hidden_tile_index     <= {HIDDEN_ADDR_WIDTH{1'b0}};
+      output_tile_index     <= {OUTPUT_ADDR_WIDTH{1'b0}};
+      l1_input_index        <= {PIXEL_ADDR_WIDTH{1'b0}};
+      l2_input_index        <= {HIDDEN_ADDR_WIDTH{1'b0}};
+      weight_load_index     <= 16'd0;
+      bias_load_index       <= 16'd0;
+      active_tile_outputs   <= 16'd0;
+      output_seen_0         <= 1'b0;
+      output_seen_1         <= 1'b0;
+      active_vpu_mode       <= 4'b0000;
+      tpu_rst               <= 1'b1;  // Reset TPU (active high)
+      busy                  <= 1'b0;
+      done                  <= 1'b0;
+      prediction_out        <= 4'd0;
 
-      ub_wr_host_data_in_0 <= 16'h0000;
-      ub_wr_host_data_in_1 <= 16'h0000;
+      ub_wr_host_data_in_0  <= 16'h0000;
+      ub_wr_host_data_in_1  <= 16'h0000;
       ub_wr_host_valid_in_0 <= 1'b0;
       ub_wr_host_valid_in_1 <= 1'b0;
-      ub_rd_start_in <= 1'b0;
-      ub_rd_transpose <= 1'b0;
-      ub_ptr_select <= 9'd0;
-      ub_rd_addr_in <= 16'd0;
-      ub_rd_row_size <= 16'd0;
-      ub_rd_col_size <= 16'd0;
-      sys_switch_in <= 1'b0;
+      ub_rd_start_in        <= 1'b0;
+      ub_rd_transpose       <= 1'b0;
+      ub_ptr_select         <= 9'd0;
+      ub_rd_addr_in         <= 16'd0;
+      ub_rd_row_size        <= 16'd0;
+      ub_rd_col_size        <= 16'd0;
+      sys_switch_in         <= 1'b0;
 
       // Clear intermediate buffers
       for (clear_index = 0; clear_index < HIDDEN_NEURONS; clear_index = clear_index + 1) begin
@@ -282,24 +282,24 @@ module mnist_tpu_tiled_classifier #(
       end
     end else begin
       // Default 1-cycle pulses for TPU control
-      done <= 1'b0;
-      ub_wr_host_data_in_0 <= 16'h0000;
-      ub_wr_host_data_in_1 <= 16'h0000;
+      done                  <= 1'b0;
+      ub_wr_host_data_in_0  <= 16'h0000;
+      ub_wr_host_data_in_1  <= 16'h0000;
       ub_wr_host_valid_in_0 <= 1'b0;
       ub_wr_host_valid_in_1 <= 1'b0;
-      ub_rd_start_in <= 1'b0;
-      ub_rd_transpose <= 1'b0;
-      ub_ptr_select <= 9'd0;
-      ub_rd_addr_in <= 16'd0;
-      ub_rd_row_size <= 16'd0;
-      ub_rd_col_size <= 16'd0;
-      sys_switch_in <= 1'b0;
+      ub_rd_start_in        <= 1'b0;
+      ub_rd_transpose       <= 1'b0;
+      ub_ptr_select         <= 9'd0;
+      ub_rd_addr_in         <= 16'd0;
+      ub_rd_row_size        <= 16'd0;
+      ub_rd_col_size        <= 16'd0;
+      sys_switch_in         <= 1'b0;
 
       case (state)
         STATE_IDLE: begin
-          tpu_rst <= 1'b0;
+          tpu_rst         <= 1'b0;
           active_vpu_mode <= 4'b0000;  // Ensure VPU is passthrough in idle
-          busy <= 1'b0;
+          busy            <= 1'b0;
           if (start) begin
             busy <= 1'b1;
             current_layer <= 1'b0;
@@ -328,20 +328,20 @@ module mnist_tpu_tiled_classifier #(
         end
 
         STATE_RESET_ASSERT: begin
-          tpu_rst <= 1'b1;
+          tpu_rst         <= 1'b1;
           active_vpu_mode <= 4'b0000;
-          state <= STATE_RESET_RELEASE;
+          state           <= STATE_RESET_RELEASE;
         end
 
         STATE_RESET_RELEASE: begin
-          tpu_rst <= 1'b0;
-          l1_input_index <= {PIXEL_ADDR_WIDTH{1'b0}};
-          l2_input_index <= {HIDDEN_ADDR_WIDTH{1'b0}};
+          tpu_rst           <= 1'b0;
+          l1_input_index    <= {PIXEL_ADDR_WIDTH{1'b0}};
+          l2_input_index    <= {HIDDEN_ADDR_WIDTH{1'b0}};
           weight_load_index <= 16'd0;
-          bias_load_index <= 16'd0;
-          output_seen_0 <= 1'b0;
-          output_seen_1 <= 1'b0;
-          state <= STATE_LOAD_INPUT;
+          bias_load_index   <= 16'd0;
+          output_seen_0     <= 1'b0;
+          output_seen_1     <= 1'b0;
+          state             <= STATE_LOAD_INPUT;
         end
 
         // --- UNIFIED BUFFER LOADING SEQUENCE ---
@@ -355,7 +355,7 @@ module mnist_tpu_tiled_classifier #(
               l1_input_index <= l1_input_index + {{(PIXEL_ADDR_WIDTH - 1){1'b0}}, 1'b1}; // Increments pixel_addr_out++ for next pixel
             end else begin
               weight_load_index <= 16'd0;  // If pixel loading complete, initialize weight index
-              state <= STATE_LOAD_WEIGHT;  // and move to weight loading state
+              state             <= STATE_LOAD_WEIGHT;  // and move to weight loading state
             end
           end else begin
             if (l2_input_index < HIDDEN_NEURONS) begin // If current layer = 1, check if current hidden activation index < total hidden neurons
@@ -381,6 +381,7 @@ module mnist_tpu_tiled_classifier #(
         // Write Weights into UB (Offsets past the Inputs)
         STATE_LOAD_WEIGHT: begin
           // If weight_load_index < {[Total Pixels (for Layer 0) or Total Hidden Neurons (for Layer 1)] * (2 normally, or 1 for edge case)}
+          // For !current_layer -> (weight_load_index < (784= * 2)) i.e. load 1568 weights for Layer 0
           if (weight_load_index < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin
             if (weight_load_index + 1 < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin // Check if 2 weights can be loaded into the 2-port UB
               // If Layer 0, load 2 weights from w1_mem, till weight_load_index 
@@ -394,7 +395,7 @@ module mnist_tpu_tiled_classifier #(
               end
               ub_wr_host_valid_in_1 <= 1'b1;
               ub_wr_host_valid_in_0 <= 1'b1;
-              weight_load_index <= weight_load_index + 16'd2;
+              weight_load_index     <= weight_load_index + 16'd2;
             end else begin
               if (!current_layer) begin
                 ub_wr_host_data_in_0 <= w1_mem[(hidden_tile_index * PIXELS * TILE_WIDTH) + weight_load_index];
@@ -402,11 +403,11 @@ module mnist_tpu_tiled_classifier #(
                 ub_wr_host_data_in_0 <= w2_mem[(output_tile_index * HIDDEN_NEURONS * TILE_WIDTH) + weight_load_index];
               end
               ub_wr_host_valid_in_0 <= 1'b1;
-              weight_load_index <= weight_load_index + 16'd1;
+              weight_load_index     <= weight_load_index + 16'd1;
             end
           end else begin
             bias_load_index <= 16'd0;
-            state <= STATE_LOAD_BIAS;
+            state           <= STATE_LOAD_BIAS;
           end
         end
 
@@ -423,7 +424,7 @@ module mnist_tpu_tiled_classifier #(
               end
               ub_wr_host_valid_in_1 <= 1'b1;
               ub_wr_host_valid_in_0 <= 1'b1;
-              bias_load_index <= bias_load_index + 16'd2;
+              bias_load_index       <= bias_load_index + 16'd2;
             end else begin
               if (!current_layer) begin
                 ub_wr_host_data_in_0 <= b1_mem[(hidden_tile_index*TILE_WIDTH)+bias_load_index];
@@ -431,7 +432,7 @@ module mnist_tpu_tiled_classifier #(
                 ub_wr_host_data_in_0 <= b2_mem[(output_tile_index*TILE_WIDTH)+bias_load_index];
               end
               ub_wr_host_valid_in_0 <= 1'b1;
-              bias_load_index <= bias_load_index + 16'd1;
+              bias_load_index       <= bias_load_index + 16'd1;
             end
           end else begin
             state <= STATE_START_WEIGHT;
@@ -441,40 +442,40 @@ module mnist_tpu_tiled_classifier #(
         // --- TPU READ COMMAND SEQUENCE ---
 
         // Command UB to stream Weights -> Top of Systolic Array
-        STATE_START_WEIGHT: begin
+        STATE_START_WEIGHT: begin  // 0x06
           ub_rd_start_in <= 1'b1;
-          ub_ptr_select <= 9'd1;  // Routing code: 1 = Top of Array
-          ub_rd_addr_in <= (!current_layer ? PIXELS : HIDDEN_NEURONS);  // Offset memory read
+          ub_ptr_select <= 9'd1;  // Routing code: 1 = Read weights into Top of Array
+          ub_rd_addr_in <= (!current_layer ? PIXELS : HIDDEN_NEURONS);  // Offset memory read to weights section of UB (past the inputs)
           ub_rd_row_size <= (!current_layer ? PIXELS : HIDDEN_NEURONS);
           ub_rd_col_size <= active_tile_outputs;
           ub_rd_transpose <= 1'b1;
           state <= STATE_START_WEIGHT_GAP;
         end
 
-        STATE_START_WEIGHT_GAP: begin
+        STATE_START_WEIGHT_GAP: begin  // 0x07
           state <= STATE_START_INPUT;
         end
 
         // Command UB to stream Inputs -> Left Side of Systolic Array
-        STATE_START_INPUT: begin
+        STATE_START_INPUT: begin  // 0x08
           // DYNAMIC HARDWARE ACTIVATION:
           // Layer 1 (current_layer=0): Set 4'b1100 to enable VPU Bias (bit 3) and Leaky ReLU (bit 2).
           // Layer 2 (current_layer=1): Set 4'b1000 to enable only VPU Bias (bit 3) for Logits.
           active_vpu_mode <= current_layer ? 4'b1000 : 4'b1100;
 
-          ub_rd_start_in <= 1'b1;
-          ub_ptr_select <= 9'd0;  // Routing code: 0 = Left side of Array
-          ub_rd_addr_in <= 16'd0;
-          ub_rd_row_size <= 16'd1;
-          ub_rd_col_size <= (!current_layer ? PIXELS : HIDDEN_NEURONS);
+          ub_rd_start_in  <= 1'b1;
+          ub_ptr_select   <= 9'd0;  // Routing code: 0 = Left side of Array
+          ub_rd_addr_in   <= 16'd0;  // Inputs are at the start of the UB memory space, so no offset
+          ub_rd_row_size  <= 16'd1;
+          ub_rd_col_size  <= (!current_layer ? PIXELS : HIDDEN_NEURONS);
           ub_rd_transpose <= 1'b0;
-          state <= STATE_SWITCH_WEIGHTS;
+          state           <= STATE_SWITCH_WEIGHTS;
         end
 
         STATE_SWITCH_WEIGHTS: begin
           // Latch weights from shadow registers into active processing registers
           sys_switch_in <= 1'b1;
-          state <= STATE_START_BIAS;
+          state         <= STATE_START_BIAS;
         end
 
         // Command UB to stream Biases -> VPU Hardware Module
@@ -519,7 +520,7 @@ module mnist_tpu_tiled_classifier #(
                         output_seen_0 &&
                         ((active_tile_outputs == 1) || output_seen_1)) begin
             active_vpu_mode <= 4'b0000;
-            state <= STATE_NEXT_TILE;
+            state           <= STATE_NEXT_TILE;
           end
         end
 
@@ -534,11 +535,11 @@ module mnist_tpu_tiled_classifier #(
               state <= STATE_RESET_ASSERT;
             end else begin
               // Switch to Output Layer (Logits)
-              current_layer <= 1'b1;
-              output_tile_index <= {OUTPUT_ADDR_WIDTH{1'b0}};
+              current_layer       <= 1'b1;
+              output_tile_index   <= {OUTPUT_ADDR_WIDTH{1'b0}};
               active_tile_outputs <= clipped_tile_outputs(OUTPUT_NEURONS);
-              tpu_rst <= 1'b1;
-              state <= STATE_RESET_ASSERT;
+              tpu_rst             <= 1'b1;
+              state               <= STATE_RESET_ASSERT;
             end
           end else begin
             if (output_tile_index + 1 < OUTPUT_TILES) begin
@@ -567,9 +568,9 @@ module mnist_tpu_tiled_classifier #(
             end
           end
           prediction_out <= best_index[3:0];
-          busy <= 1'b0;
-          done <= 1'b1;
-          state <= STATE_DONE;
+          busy           <= 1'b0;
+          done           <= 1'b1;
+          state          <= STATE_DONE;
         end
 
         STATE_DONE: begin
