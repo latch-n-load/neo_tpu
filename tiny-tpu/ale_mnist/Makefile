@@ -103,6 +103,9 @@ YELLOW = \033[0;33m
 BLUE = \033[0;34m
 NC = \033[0m # No Color
 
+# Log levels: 0 = Silent (Default), 1 = High (Verbose), 2 = Medium, 3 = Low
+LOG_LEVEL ?= 0
+
 .PHONY: all clean run wave lint format fix help distclean
 
 # ==============================================================================
@@ -243,18 +246,13 @@ $(EXECUTABLE): $(ALL_VERILOG) $(CPP_TB)
 	@echo "$(GREEN)Build successful: $(EXECUTABLE)$(NC)"
 
 # ==============================================================================
-# Quick build (skip lint/format)
-# ==============================================================================
-quick: $(EXECUTABLE)
-
-# ==============================================================================
 # Run simulation without trace
 # ==============================================================================
 run: $(EXECUTABLE)
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)  Running Simulation$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
-	./$(OUTPUT_DIR)/$(EXECUTABLE)
+	./$(EXECUTABLE) --log-level $(LOG_LEVEL)
 
 # ==============================================================================
 # Run simulation with waveform trace
@@ -263,7 +261,7 @@ wave: $(EXECUTABLE)
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)  Running Simulation with Trace$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
-	./$(EXECUTABLE) --trace
+	./$(EXECUTABLE) --trace --log-level $(LOG_LEVEL)
 	@echo "$(GREEN)Waveform saved to mnist_tpu_classifier.vcd$(NC)"
 
 # ==============================================================================
