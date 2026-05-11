@@ -8,6 +8,7 @@
 SOURCE_DIR = src
 TEST_DIR = test
 OUTPUT_DIR = obj_dir
+WAVE_DIR = waveforms
 
 # Output Executable Settings
 EXEC_NAME = Vmnist_tpu_tiled_classifier_tb
@@ -89,12 +90,11 @@ VERILOG_SOURCES = $(SOURCE_DIR)/pe.v \
 					$(SOURCE_DIR)/gradient_descent.v \
 					$(SOURCE_DIR)/mnist_tpu_tiled_classifier.v
 
-# Testbench files
+# Links to files
 VERILOG_TB = $(TEST_DIR)/mnist_tpu_tiled_classifier_tb.v
 CPP_TB = $(TEST_DIR)/test_main.cpp
-
-# All Verilog files
 ALL_VERILOG = $(VERILOG_SOURCES) $(VERILOG_TB)
+WAVE_FILE = $(WAVE_DIR)/mnist_tpu_classifier.vcd
 
 # Colors for output
 RED = \033[0;31m
@@ -261,15 +261,22 @@ wave: $(EXECUTABLE)
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)  Running Simulation with Trace$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
-	./$(EXECUTABLE) --trace --log-level $(LOG_LEVEL)
-	@echo "$(GREEN)Waveform saved to mnist_tpu_classifier.vcd$(NC)"
+	@mkdir -p $(WAVE_DIR)
+	./$(EXECUTABLE) --trace --wave-file $(WAVE_FILE) --log-level $(LOG_LEVEL)
+	@echo "$(GREEN)Waveform successfully written to $(WAVE_FILE)$(NC)"
 
 # ==============================================================================
 # View waveforms
 # ==============================================================================
 view:
-	@if [ -f mnist_tpu_classifier.vcd ]; then \
-		gtkwave mnist_tpu_classifier.vcd & \
+	@echo "$(BLUE)Opening waveform in GTKWave...$(NC)"
+	@if [ -f $(WAVE_FILE) ]; then \
+		if [ -f $(WAVE_DIR)/mnist_tpu_classifier.gtkw ]; then \
+			gtkwave $(WAVE_FILE) $(WAVE_DIR)/mnist_tpu_classifier.gtkw & \
+		else \
+			echo "$(YELLOW)No .gtkw save file found. Opening default layout...$(NC)"; \
+			gtkwave $(WAVE_FILE) & \
+		fi \
 	else \
 		echo "$(RED)No waveform file found. Run 'make wave' first.$(NC)"; \
 	fi
@@ -313,7 +320,7 @@ check-tools:
 clean:
 	@echo "$(YELLOW)Cleaning build artifacts...$(NC)"
 	rm -rf $(OUTPUT_DIR)
-	rm -f mnist_tpu_classifier.vcd
+	rm -rf $(WAVE_DIR)/*.vcd
 	rm -f verible_fixes.txt
 	rm -f *.bak
 	@echo "$(GREEN)Clean complete$(NC)"
@@ -325,4 +332,5 @@ distclean: clean
 	@echo "$(YELLOW)Deep cleaning...$(NC)"
 	rm -rf obj_dir_*
 	rm -f .verilator_cache
+	rm -rf $(WAVE_DIR)
 	@echo "$(GREEN)Deep clean complete$(NC)"

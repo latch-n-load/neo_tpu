@@ -253,11 +253,19 @@ int main(int argc, char** argv) {
     top = new Vmnist_tpu_tiled_classifier_tb;
     
     bool trace_enabled = false;
+    // Default fallback path, just in case
+    std::string wave_file_path = "mnist_tpu_classifier.vcd"; 
+    
     for (int i = 1; i < argc; i++) {
         // Check for trace argument
         if (strcmp(argv[i], "--trace") == 0) trace_enabled = true;
 
-        // Check for log level argument (e.g., "--log-level 2")
+        // Get wave-file argument from Makefile
+        if (strcmp(argv[i], "--wave-file") == 0 && i + 1 < argc) {
+            wave_file_path = argv[++i];
+        }
+        
+        // Get log-level argument from Makefile
         if (strcmp(argv[i], "--log-level") == 0 && i + 1 < argc) {
             int level = std::atoi(argv[++i]);
             if (level >= 0 && level <= 3) {
@@ -272,8 +280,7 @@ int main(int argc, char** argv) {
         Verilated::traceEverOn(true);
         tfp = new VerilatedVcdC;
         top->trace(tfp, 99);
-        tfp->open("mnist_tpu_classifier.vcd");
-        TB_LOG(LOG_LOW, "[TB] Waveform tracing enabled -> mnist_tpu_classifier.vcd" << std::endl);
+        tfp->open(wave_file_path.c_str()); 
     }
 
     // 1. Generate Test Image
@@ -394,7 +401,7 @@ int main(int argc, char** argv) {
         }
     }
     
-    std::cout << "\n============================================" << std::endl;
+    TB_LOG(LOG_LOW, "\n============================================" << std::endl);
     if (inference_complete) {
         TB_LOG(LOG_LOW, "[RESULT] All expected VPU outputs harvested successfully!" << std::endl);
     } else {
@@ -403,7 +410,7 @@ int main(int argc, char** argv) {
         TB_LOG(LOG_LOW, "         Harvested " << logits_checked_count << "/" << OUTPUT_NEURONS << " Logits" << std::endl);
     }
     
-    std::cout << "--------------------------------------------" << std::endl;
+    TB_LOG(LOG_LOW, "--------------------------------------------" << std::endl);
     TB_LOG(LOG_LOW, "Hidden Errors: " << hidden_errors << " / " << hidden_checked_count << std::endl);
     TB_LOG(LOG_LOW, "Logit Errors:  " << logit_errors << " / " << logits_checked_count << std::endl);
     
