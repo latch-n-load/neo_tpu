@@ -14,6 +14,50 @@
 #include <fstream>
 #include <sstream>
 
+#include <cstdlib> // Added for atoi()
+
+// ==============================================================================
+// Logging Engine
+// ==============================================================================
+// ANSI Color Codes
+#define COLOR_ORANGE "\033[38;5;214m"
+#define COLOR_YELLOW "\033[33m"
+#define COLOR_RESET  "\033[0m"  // Resets back to default white terminal text
+
+enum LogLevel {
+    LOG_NONE = 0, // Silent (Default)
+    LOG_LOW = 1, // Orange: Layer summaries, major state changes
+    LOG_MED  = 2, // Yellow: Neuron-level final accumulations
+    LOG_HIGH  = 3  // White: Pixel-level math (Very verbose!)
+};
+
+// Global active threshold
+static LogLevel active_log_level = LOG_LOW;
+
+// Helper to grab the right color based on the level
+inline const char* get_level_color(LogLevel level) {
+    if (level == LOG_LOW) return COLOR_ORANGE;
+    if (level == LOG_MED)  return COLOR_YELLOW;
+    return COLOR_RESET; // LOG_HIGH is standard white
+}
+
+// Logging Macro: Injects color, prints the message, then resets color
+#define TB_LOG(level, msg) \
+    do { \
+        if (level <= active_log_level) { \
+            std::cout << get_level_color(level) << msg << COLOR_RESET; \
+        } \
+    } while(0)
+
+// Pause Macro
+#define TB_LOG_PAUSE(level) \
+    do { \
+        if (level <= active_log_level) { \
+            std::cout << get_level_color(level) << "Press Enter to proceed..." << COLOR_RESET << std::endl; \
+            std::cin.get(); \
+        } \
+    } while(0)
+
 // Simulation parameters
 static const int CLK_PERIOD_PS = 10000;  
 static const int PIXELS = 784;
@@ -66,7 +110,7 @@ static int16_t q8_8_mul(int16_t a, int16_t b) {
 static void load_memh(const std::string& filepath, std::vector<int16_t>& mem) {
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        std::cerr << "[ERROR] Could not open " << filepath << std::endl;
+        TB_LOG(LOG_LOW, "[ERROR] Could not open " << filepath << std::endl);
         exit(1);
     }
     std::string line;
@@ -78,14 +122,32 @@ static void load_memh(const std::string& filepath, std::vector<int16_t>& mem) {
         ss >> val;
         mem.push_back((int16_t)val);
     }
-    std::cout << "[TB] Loaded " << mem.size() << " elements from " << filepath << std::endl;
+    TB_LOG(LOG_HIGH, "[TB] Loaded " << mem.size() << " elements from " << filepath << std::endl);
+}
+
+// ==============================================================================
+// Debug Formatting Helper
+// ==============================================================================
+// Formats an int16_t from Q8.8 to float and Hex: "1.5000 [0x0180]"
+static std::string fmt_16(int16_t val) {
+    std::stringstream ss;
+    
+    // Convert Q8.8 fixed-point to float by dividing by 2^8 (256.0)
+    float real_val = (float)val / 256.0f; 
+    
+    // Print float with 4 decimal places, then the exact 16-bit hex
+    ss << std::fixed << std::setprecision(4) << real_val << " [0x" 
+       << std::hex << std::setw(4) << std::setfill('0') << (uint16_t)val 
+       << std::dec << "]";
+       
+    return ss.str();
 }
 
 // ==============================================================================
 // Compute Golden Reference
 // ==============================================================================
 static void compute_expected_outputs() {
-    std::cout << "[TB] Computing C++ Expected Outputs..." << std::endl;
+    TB_LOG(LOG_MED, "[TB] Computing C++ Expected Outputs..." << std::endl);
     
     // Layer 1
     for (int h = 0; h < HIDDEN_NEURONS; h++) {
@@ -94,14 +156,27 @@ static void compute_expected_outputs() {
         int16_t acc = 0;
         for (int p = 0; p < PIXELS; p++) {
             int w_idx = (h_tile * PIXELS * 2) + (p * 2) + h_rem;
-            acc = sat_add(acc, q8_8_mul(test_image[p], w1_mem[w_idx]));
-            std::cout << "[TB] Current Product: test_image[" << p << "] (" << test_image[p] << ") * w1_mem[" << w_idx << "] = (" << w1_mem[w_idx] << ") = " << q8_8_mul(test_image[p], w1_mem[w_idx]) << std::endl;
-            std::cout << "[TB] Accumulator after adding product: " << acc << std::endl;
+            int16_t prod = q8_8_mul(test_image[p], w1_mem[w_idx]);
+            acc = sat_add(acc, prod);
+            
+            // LOG_HIGH: Only prints if verbosity is set to 3
+            // TB_LOG(LOG_HIGH, "[TB L0] Neuron " << h << ", Pixel " << p << ":" << std::endl
+            //                << "        test_image[" << p << "] (" << fmt_16(test_image[p]) 
+            //                << ") * w1_mem[" << w_idx << "] (" << fmt_16(w1_mem[w_idx]) 
+            //                << ") = " << fmt_16(prod) << std::endl
+            //                << "        Accumulator after adding product: " << fmt_16(acc) << std::endl);
+            // TB_LOG_PAUSE(LOG_HIGH);
         }
-        acc = sat_add(acc, b1_mem[h]);
-        std::cout << "[TB] Accumulator + bias b1_mem[" << h << "] = " << b1_mem[h] << " = " << acc << std::endl;
-        if (acc < 0) acc = 0; // ReLU
+
+        int16_t acc_pre_RELU = sat_add(acc, b1_mem[h]);
+        if (acc_pre_RELU < 0) acc = acc_pre_RELU*0.5;
+        else acc = acc_pre_RELU;
         expected_hidden[h] = acc;
+
+        TB_LOG(LOG_HIGH, "[TB L0] Neuron " << h << ": acc " << fmt_16(acc_pre_RELU) << " + bias b1_mem[" 
+                        << h << "] " << fmt_16(b1_mem[h]) << " and ReLU (0.5) = " << fmt_16(expected_hidden[h]) 
+                        << std::endl);
+        TB_LOG_PAUSE(LOG_HIGH);
     }
 
     // Layer 2
@@ -111,11 +186,26 @@ static void compute_expected_outputs() {
         int16_t acc = 0;
         for (int h = 0; h < HIDDEN_NEURONS; h++) {
             int w_idx = (o_tile * HIDDEN_NEURONS * 2) + (h * 2) + o_rem;
-            acc = sat_add(acc, q8_8_mul(expected_hidden[h], w2_mem[w_idx]));
+            int16_t prod = q8_8_mul(expected_hidden[h], w2_mem[w_idx]);
+            acc = sat_add(acc, prod);
+            
+            // TB_LOG(LOG_HIGH, "[TB L1] Output " << o << ", Hidden " << h << ":" << std::endl
+            //                << "        expected_hidden[" << h << "] (" << fmt_16(expected_hidden[h]) 
+            //                << ") * w2_mem[" << w_idx << "] (" << fmt_16(w2_mem[w_idx]) 
+            //                << ") = " << fmt_16(prod) << std::endl
+            //                << "        Accumulator after adding product: " << fmt_16(acc) << std::endl);
+            // TB_LOG_PAUSE(LOG_HIGH);
         }
+        
         acc = sat_add(acc, b2_mem[o]);
         expected_logits[o] = acc;
+
+        TB_LOG(LOG_HIGH, "[TB L1] Output " << o << " Accumulator + bias b2_mem[" 
+            << o << "] (" << fmt_16(b2_mem[o]) << ") = " << fmt_16(acc) << std::endl);
+        TB_LOG_PAUSE(LOG_HIGH);
     }
+    
+    TB_LOG(LOG_LOW, "[TB] C++ Reference Computation Complete." << std::endl);
 }
 
 // ==============================================================================
@@ -129,7 +219,7 @@ static void generate_test_image() {
         test_image[row * 28 + 13] = 0x8000; 
         test_image[row * 28 + 14] = 0xFF00; 
     }
-    std::cout << "[TB] Generated test image (vertical line pattern)" << std::endl;
+    TB_LOG(LOG_LOW, "[TB] Generated test image (vertical line pattern)" << std::endl);
 }
 
 // ==============================================================================
@@ -152,7 +242,7 @@ static void apply_reset(int cycles) {
         toggle_clock();
     }
     top->rst = 0;
-    std::cout << "[TB] Reset released after " << cycles << " cycles" << std::endl;
+    TB_LOG(LOG_MED, "[TB] Reset released after " << cycles << " cycles" << std::endl);
 }
 
 // ==============================================================================
@@ -164,7 +254,18 @@ int main(int argc, char** argv) {
     
     bool trace_enabled = false;
     for (int i = 1; i < argc; i++) {
+        // Check for trace argument
         if (strcmp(argv[i], "--trace") == 0) trace_enabled = true;
+
+        // Check for log level argument (e.g., "--log-level 2")
+        if (strcmp(argv[i], "--log-level") == 0 && i + 1 < argc) {
+            int level = std::atoi(argv[++i]);
+            if (level >= 0 && level <= 3) {
+                active_log_level = static_cast<LogLevel>(level);
+            } else {
+                TB_LOG(LOG_LOW, "[WARNING] Invalid log level. Using 0 (Silent). Valid options: 1 (High), 2 (Med), 3 (Low)." << std::endl);
+            }
+        }
     }
     
     if (trace_enabled) {
@@ -172,15 +273,18 @@ int main(int argc, char** argv) {
         tfp = new VerilatedVcdC;
         top->trace(tfp, 99);
         tfp->open("mnist_tpu_classifier.vcd");
-        std::cout << "[TB] Waveform tracing enabled -> mnist_tpu_classifier.vcd" << std::endl;
+        TB_LOG(LOG_LOW, "[TB] Waveform tracing enabled -> mnist_tpu_classifier.vcd" << std::endl);
     }
-    
-    // 1. Generate Image & Load Weights
+
+    // 1. Generate Test Image
     generate_test_image();
+
+    // Load weights and biases for golden reference computation
     load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w1_tiled_q8_8.memh", w1_mem);
     load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b1_q8_8.memh", b1_mem);
     load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/w2_tiled_q8_8.memh", w2_mem);
     load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b2_q8_8.memh", b2_mem);
+    TB_LOG(LOG_LOW, "[TB] All weights and biases loaded successfully." << std::endl);
     
     // 2. Compute C++ Golden Reference
     compute_expected_outputs();
@@ -193,7 +297,7 @@ int main(int argc, char** argv) {
     
     apply_reset(10); 
     
-    std::cout << "[TB] Asserting start pulse..." << std::endl;
+    TB_LOG(LOG_LOW, "[TB] Asserting start pulse..." << std::endl);
     toggle_clock(); 
     top->start = 1; 
     toggle_clock(); 
@@ -226,11 +330,16 @@ int main(int argc, char** argv) {
             // Check Channel 1
             if (top->debug_vpu_valid_1) {
                 int16_t hw_val = (int16_t)top->debug_vpu_out_1;
+                TB_LOG(LOG_MED, "[TB] VPU Output 1 on Layer " << (int)current_layer << ": " 
+                << fmt_16(hw_val) << std::endl);
+
                 if (current_layer == 0) {
                     if (hidden_checked_count < HIDDEN_NEURONS) {
                         int16_t exp_val = expected_hidden[hidden_checked_count];
                         if (hw_val != exp_val) {
-                            if (hidden_errors < 10) std::cout << "[FAIL] L1 Hidden[" << hidden_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            if (hidden_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
+                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << cycle_count << std::endl);
                             hidden_errors++;
                         }
                         hidden_checked_count++;
@@ -239,7 +348,9 @@ int main(int argc, char** argv) {
                     if (logits_checked_count < OUTPUT_NEURONS) {
                         int16_t exp_val = expected_logits[logits_checked_count];
                         if (hw_val != exp_val) {
-                            if (logit_errors < 10) std::cout << "[FAIL] L2 Logit[" << logits_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
+                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << cycle_count << std::endl);
                             logit_errors++;
                         }
                         logits_checked_count++;
@@ -254,7 +365,9 @@ int main(int argc, char** argv) {
                     if (hidden_checked_count < HIDDEN_NEURONS) {
                         int16_t exp_val = expected_hidden[hidden_checked_count];
                         if (hw_val != exp_val) {
-                            if (hidden_errors < 10) std::cout << "[FAIL] L1 Hidden[" << hidden_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            if (hidden_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
+                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << cycle_count << std::endl);
                             hidden_errors++;
                         }
                         hidden_checked_count++;
@@ -263,7 +376,9 @@ int main(int argc, char** argv) {
                     if (logits_checked_count < OUTPUT_NEURONS) {
                         int16_t exp_val = expected_logits[logits_checked_count];
                         if (hw_val != exp_val) {
-                            if (logit_errors < 10) std::cout << "[FAIL] L2 Logit[" << logits_checked_count << "] HW: " << hw_val << " | EXP: " << exp_val << " @ cycle " << cycle_count << std::endl;
+                            if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
+                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << cycle_count << std::endl);
                             logit_errors++;
                         }
                         logits_checked_count++;
@@ -281,16 +396,16 @@ int main(int argc, char** argv) {
     
     std::cout << "\n============================================" << std::endl;
     if (inference_complete) {
-        std::cout << "[RESULT] All expected VPU outputs harvested successfully!" << std::endl;
+        TB_LOG(LOG_LOW, "[RESULT] All expected VPU outputs harvested successfully!" << std::endl);
     } else {
-        std::cout << "[RESULT] TIMEOUT! Failed to harvest all VPU outputs." << std::endl;
-        std::cout << "         Harvested " << hidden_checked_count << "/" << HIDDEN_NEURONS << " Hidden Neurons" << std::endl;
-        std::cout << "         Harvested " << logits_checked_count << "/" << OUTPUT_NEURONS << " Logits" << std::endl;
+        TB_LOG(LOG_LOW, "[RESULT] TIMEOUT! Failed to harvest all VPU outputs." << std::endl);
+        TB_LOG(LOG_LOW, "         Harvested " << hidden_checked_count << "/" << HIDDEN_NEURONS << " Hidden Neurons" << std::endl);
+        TB_LOG(LOG_LOW, "         Harvested " << logits_checked_count << "/" << OUTPUT_NEURONS << " Logits" << std::endl);
     }
     
     std::cout << "--------------------------------------------" << std::endl;
-    std::cout << "Hidden Errors: " << hidden_errors << " / " << hidden_checked_count << std::endl;
-    std::cout << "Logit Errors:  " << logit_errors << " / " << logits_checked_count << std::endl;
+    TB_LOG(LOG_LOW, "Hidden Errors: " << hidden_errors << " / " << hidden_checked_count << std::endl);
+    TB_LOG(LOG_LOW, "Logit Errors:  " << logit_errors << " / " << logits_checked_count << std::endl);
     
     // Predict manually from our collected logits if we got them all
     if (logits_checked_count == OUTPUT_NEURONS) {
@@ -302,11 +417,11 @@ int main(int argc, char** argv) {
                 best_idx = i;
             }
         }
-        std::cout << "Expected Digit (C++ Argmax): " << best_idx << std::endl;
+        TB_LOG(LOG_LOW, "Expected Digit (C++ Argmax): " << best_idx << std::endl);
     }
     
-    std::cout << "Total Cycles: " << cycle_count << std::endl;
-    std::cout << "============================================\n" << std::endl;
+    TB_LOG(LOG_LOW, "Total Cycles: " << cycle_count << std::endl);
+    TB_LOG(LOG_LOW, "============================================\n" << std::endl);
     
     // Add extra cycles for observation in the waveform
     for (int i = 0; i < 20; i++) {
