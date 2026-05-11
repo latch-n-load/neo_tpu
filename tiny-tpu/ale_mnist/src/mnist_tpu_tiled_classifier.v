@@ -1,6 +1,8 @@
 // ==============================================================================
 // MODULE: mnist_tpu_tiled_classifier
+// Last Status: Found only first 4 weights and
 //
+
 // SUMMARY:
 // This module implements a highly optimized, hardware-accelerated Multilayer 
 // Perceptron (MLP) for MNIST digit classification utilizing a custom "Tiny-TPU" 
@@ -198,7 +200,7 @@ module mnist_tpu_tiled_classifier #(
       .vpu_data_pathway(active_vpu_mode),
 
       .sys_switch_in              (sys_switch_in),
-      .vpu_leak_factor_in         (16'h0003),                  // Standard leaky ReLU constant
+      .vpu_leak_factor_in         (16'h0080),                  // Standard leaky ReLU constant = 0.5
       .inv_batch_size_times_two_in(16'h0000),
       .sys_data_out_21            (sys_data_out_21),
       .sys_data_out_22            (sys_data_out_22),
@@ -381,10 +383,10 @@ module mnist_tpu_tiled_classifier #(
         // Write Weights into UB (Offsets past the Inputs)
         STATE_LOAD_WEIGHT: begin
           // If weight_load_index < {[Total Pixels (for Layer 0) or Total Hidden Neurons (for Layer 1)] * (2 normally, or 1 for edge case)}
-          // For !current_layer -> (weight_load_index < (784= * 2)) i.e. load 1568 weights for Layer 0
+          // For !current_layer -> (weight_load_index < (784 * 2)) i.e. load 1568 weights for Layer 0
           if (weight_load_index < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin
             if (weight_load_index + 1 < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin // Check if 2 weights can be loaded into the 2-port UB
-              // If Layer 0, load 2 weights from w1_mem, till weight_load_index 
+              // If Layer 0, load 2 weights from w1_mem
               if (!current_layer) begin
                 ub_wr_host_data_in_1 <= w1_mem[(hidden_tile_index * PIXELS * TILE_WIDTH) + weight_load_index];
                 ub_wr_host_data_in_0 <= w1_mem[(hidden_tile_index * PIXELS * TILE_WIDTH) + weight_load_index + 1];
@@ -472,14 +474,14 @@ module mnist_tpu_tiled_classifier #(
           state           <= STATE_SWITCH_WEIGHTS;
         end
 
-        STATE_SWITCH_WEIGHTS: begin
+        STATE_SWITCH_WEIGHTS: begin  // 0x09
           // Latch weights from shadow registers into active processing registers
           sys_switch_in <= 1'b1;
           state         <= STATE_START_BIAS;
         end
 
         // Command UB to stream Biases -> VPU Hardware Module
-        STATE_START_BIAS: begin
+        STATE_START_BIAS: begin  // 0x0A d_10
           ub_rd_start_in <= 1'b1;
           ub_ptr_select <= 9'd2;  // Routing code: 2 = VPU Bias Interface
           ub_rd_addr_in <= (!current_layer ? (PIXELS + (PIXELS * active_tile_outputs)) : (HIDDEN_NEURONS + (HIDDEN_NEURONS * active_tile_outputs)));
@@ -496,7 +498,7 @@ module mnist_tpu_tiled_classifier #(
         // Wait for the VPU to finish its pipeline.
         // Because VPU hardware bias and ReLU are enabled, the returned data 
         // is completely finished and can be dumped directly into memory without math.
-        STATE_WAIT_OUTPUT: begin
+        STATE_WAIT_OUTPUT: begin  // 0x0B d_11
           if (vpu_valid_out_1) begin
             output_seen_0 <= 1'b1;
             if (!current_layer) begin
@@ -524,7 +526,7 @@ module mnist_tpu_tiled_classifier #(
           end
         end
 
-        STATE_NEXT_TILE: begin
+        STATE_NEXT_TILE: begin  // 0x0C d_12
           if (!current_layer) begin
             if (hidden_tile_index + 1 < HIDDEN_TILES) begin
               hidden_tile_index <= hidden_tile_index + {{(HIDDEN_ADDR_WIDTH - 1) {1'b0}}, 1'b1};
@@ -556,7 +558,7 @@ module mnist_tpu_tiled_classifier #(
         end
 
         // Determine the highest Logit score for prediction
-        STATE_ARGMAX: begin
+        STATE_ARGMAX: begin  // 0x0D d_13
           best_index = 0;
           best_value = logits_buffer[0];
           for (
@@ -573,7 +575,7 @@ module mnist_tpu_tiled_classifier #(
           state          <= STATE_DONE;
         end
 
-        STATE_DONE: begin
+        STATE_DONE: begin  // 0x0E d_14
           state <= STATE_IDLE;
         end
 

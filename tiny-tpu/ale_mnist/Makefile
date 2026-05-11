@@ -9,6 +9,7 @@ SOURCE_DIR = src
 TEST_DIR = test
 OUTPUT_DIR = obj_dir
 WAVE_DIR = waveforms
+DATA_DIR = data
 
 # Output Executable Settings
 EXEC_NAME = Vmnist_tpu_tiled_classifier_tb
@@ -27,7 +28,7 @@ VERILATOR_FLAGS = -Wall \
                   -Wno-PINCONNECTEMPTY -Wno-PINMISSING \
                   -Wno-DECLFILENAME -Wno-UNUSEDPARAM -Wno-BLKSEQ \
                   --trace --cc --exe --build -j 0 \
-                  -CFLAGS "-O3 -march=native" \
+                  -CFLAGS "-O3 -march=native -I$(PWD)/$(DATA_DIR)" \
                   --top-module mnist_tpu_tiled_classifier_tb
 
 
@@ -95,6 +96,7 @@ VERILOG_TB = $(TEST_DIR)/mnist_tpu_tiled_classifier_tb.v
 CPP_TB = $(TEST_DIR)/test_main.cpp
 ALL_VERILOG = $(VERILOG_SOURCES) $(VERILOG_TB)
 WAVE_FILE = $(WAVE_DIR)/mnist_tpu_classifier.vcd
+MNIST_HEADER = $(DATA_DIR)/mnist_image_data.h
 
 # Colors for output
 RED = \033[0;31m
@@ -235,7 +237,7 @@ verilator-lint:
 # ==============================================================================
 build: $(EXECUTABLE)
 
-$(EXECUTABLE): $(ALL_VERILOG) $(CPP_TB)
+$(EXECUTABLE): $(ALL_VERILOG) $(CPP_TB) $(MNIST_HEADER)
 	@echo "$(BLUE)========================================$(NC)"
 	@echo "$(BLUE)  Verilator Build$(NC)"
 	@echo "$(BLUE)========================================$(NC)"
@@ -332,5 +334,5 @@ distclean: clean
 	@echo "$(YELLOW)Deep cleaning...$(NC)"
 	rm -rf obj_dir_*
 	rm -f .verilator_cache
-	rm -rf $(WAVE_DIR)
+	rm -rf $(WAVE_DIR)/*.vcd
 	@echo "$(GREEN)Deep clean complete$(NC)"

@@ -70,38 +70,38 @@ module tpu_mnist #(
       .UNIFIED_BUFFER_WIDTH(UNIFIED_BUFFER_WIDTH),
       .SYSTOLIC_ARRAY_WIDTH(SYSTOLIC_ARRAY_WIDTH)
   ) ub_inst (
-      .clk                     (clk),
-      .rst                     (rst),
-      .ub_wr_data_in_0         (ub_wr_data_in_0),
-      .ub_wr_data_in_1         (ub_wr_data_in_1),
-      .ub_wr_valid_in_0        (ub_wr_valid_in_0),
-      .ub_wr_valid_in_1        (ub_wr_valid_in_1),
-      .ub_wr_host_data_in_0    (ub_wr_host_data_in_0),
-      .ub_wr_host_data_in_1    (ub_wr_host_data_in_1),
-      .ub_wr_host_valid_in_0   (ub_wr_host_valid_in_0),
-      .ub_wr_host_valid_in_1   (ub_wr_host_valid_in_1),
-      .ub_rd_start_in          (ub_rd_start_in),
-      .ub_rd_transpose         (ub_rd_transpose),
-      .ub_ptr_select           (ub_ptr_select),
-      .ub_rd_addr_in           (ub_rd_addr_in),
-      .ub_rd_row_size          (ub_rd_row_size),
-      .ub_rd_col_size          (ub_rd_col_size),
-      .learning_rate_in        (learning_rate_in),
-      .ub_rd_input_data_out_0  (ub_rd_input_data_out_0),
-      .ub_rd_input_data_out_1  (ub_rd_input_data_out_1),
-      .ub_rd_input_valid_out_0 (ub_rd_input_valid_out_0),
-      .ub_rd_input_valid_out_1 (ub_rd_input_valid_out_1),
-      .ub_rd_weight_data_out_0 (ub_rd_weight_data_out_0),
-      .ub_rd_weight_data_out_1 (ub_rd_weight_data_out_1),
+      .clk(clk),
+      .rst(rst),
+      .ub_wr_data_in_0(ub_wr_data_in_0),  // Write data from VPU_o to UB
+      .ub_wr_data_in_1(ub_wr_data_in_1),  // Write data from VPU_o to UB 
+      .ub_wr_valid_in_0(ub_wr_valid_in_0),
+      .ub_wr_valid_in_1(ub_wr_valid_in_1),
+      .ub_wr_host_data_in_0(ub_wr_host_data_in_0),  // Write data from Host to UB
+      .ub_wr_host_data_in_1(ub_wr_host_data_in_1),  // Write data from Host to UB
+      .ub_wr_host_valid_in_0(ub_wr_host_valid_in_0),
+      .ub_wr_host_valid_in_1(ub_wr_host_valid_in_1),
+      .ub_rd_start_in(ub_rd_start_in),  // Start signal for UB read operations
+      .ub_rd_transpose(ub_rd_transpose),  // Signal to transpose UB data reads
+      .ub_ptr_select(ub_ptr_select),
+      .ub_rd_addr_in(ub_rd_addr_in),  // Address for UB read operations
+      .ub_rd_row_size(ub_rd_row_size),  // Row size for UB read operations
+      .ub_rd_col_size(ub_rd_col_size),  // Column size for UB read operations
+      .learning_rate_in(learning_rate_in),
+      .ub_rd_input_data_out_0(ub_rd_input_data_out_0),  // Read input data from UB to Systolic Array
+      .ub_rd_input_data_out_1(ub_rd_input_data_out_1),  // Read input data from UB to Systolic Array
+      .ub_rd_input_valid_out_0(ub_rd_input_valid_out_0),
+      .ub_rd_input_valid_out_1(ub_rd_input_valid_out_1),
+      .ub_rd_weight_data_out_0(ub_rd_weight_data_out_0),  // Read weights from UB to Systolic Array
+      .ub_rd_weight_data_out_1(ub_rd_weight_data_out_1),  // Read weights from UB to Systolic Array
       .ub_rd_weight_valid_out_0(ub_rd_weight_valid_out_0),
       .ub_rd_weight_valid_out_1(ub_rd_weight_valid_out_1),
-      .ub_rd_bias_data_out_0   (ub_rd_bias_data_out_0),
-      .ub_rd_bias_data_out_1   (ub_rd_bias_data_out_1),
-      .ub_rd_Y_data_out_0      (ub_rd_Y_data_out_0),
-      .ub_rd_Y_data_out_1      (ub_rd_Y_data_out_1),
-      .ub_rd_H_data_out_0      (ub_rd_H_data_out_0),
-      .ub_rd_H_data_out_1      (ub_rd_H_data_out_1),
-      .ub_rd_col_size_out      (ub_rd_col_size_out),
+      .ub_rd_bias_data_out_0(ub_rd_bias_data_out_0),  // Read bias from UB to VPU
+      .ub_rd_bias_data_out_1(ub_rd_bias_data_out_1),  // Read bias from UB to VPU
+      .ub_rd_Y_data_out_0(ub_rd_Y_data_out_0),
+      .ub_rd_Y_data_out_1(ub_rd_Y_data_out_1),
+      .ub_rd_H_data_out_0(ub_rd_H_data_out_0),
+      .ub_rd_H_data_out_1(ub_rd_H_data_out_1),
+      .ub_rd_col_size_out(ub_rd_col_size_out),
       .ub_rd_col_size_valid_out(ub_rd_col_size_valid_out)
   );
 
