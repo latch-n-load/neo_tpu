@@ -298,7 +298,7 @@ module mnist_tpu_tiled_classifier #(
       sys_switch_in         <= 1'b0;
 
       case (state)
-        STATE_IDLE: begin
+        STATE_IDLE: begin  // 0x01
           tpu_rst         <= 1'b0;
           active_vpu_mode <= 4'b0000;  // Ensure VPU is passthrough in idle
           busy            <= 1'b0;
@@ -329,13 +329,13 @@ module mnist_tpu_tiled_classifier #(
           end
         end
 
-        STATE_RESET_ASSERT: begin
+        STATE_RESET_ASSERT: begin  // 0x01
           tpu_rst         <= 1'b1;
           active_vpu_mode <= 4'b0000;
           state           <= STATE_RESET_RELEASE;
         end
 
-        STATE_RESET_RELEASE: begin
+        STATE_RESET_RELEASE: begin  // 0x02
           tpu_rst           <= 1'b0;
           l1_input_index    <= {PIXEL_ADDR_WIDTH{1'b0}};
           l2_input_index    <= {HIDDEN_ADDR_WIDTH{1'b0}};
@@ -349,7 +349,7 @@ module mnist_tpu_tiled_classifier #(
         // --- UNIFIED BUFFER LOADING SEQUENCE ---
 
         // Write Input Activations (Layer 0) and hidden activations (Layer 1) into UB
-        STATE_LOAD_INPUT: begin
+        STATE_LOAD_INPUT: begin  // 0x03
           if (!current_layer) begin  // If current layer = 0
             if (l1_input_index < PIXELS) begin  // If current no of pixel < total pixels
               ub_wr_host_data_in_0 <= pixel_data_in; // Input to TPU (UB) from host, pixel data Q8.8
@@ -381,9 +381,9 @@ module mnist_tpu_tiled_classifier #(
         end
 
         // Write Weights into UB (Offsets past the Inputs)
-        STATE_LOAD_WEIGHT: begin
+        STATE_LOAD_WEIGHT: begin  // 0x04
           // If weight_load_index < {[Total Pixels (for Layer 0) or Total Hidden Neurons (for Layer 1)] * (2 normally, or 1 for edge case)}
-          // For !current_layer -> (weight_load_index < (784 * 2)) i.e. load 1568 weights for Layer 0
+          // For !current_layer -> (weight_load_index < (784 * 2)) i.e. load 0 to 1567 weights for Layer 0
           if (weight_load_index < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin
             if (weight_load_index + 1 < ((!current_layer ? PIXELS : HIDDEN_NEURONS) * active_tile_outputs)) begin // Check if 2 weights can be loaded into the 2-port UB
               // If Layer 0, load 2 weights from w1_mem
@@ -407,14 +407,14 @@ module mnist_tpu_tiled_classifier #(
               ub_wr_host_valid_in_0 <= 1'b1;
               weight_load_index     <= weight_load_index + 16'd1;
             end
-          end else begin
+          end else begin  // for first load: else if weight_load_index >= 1578
             bias_load_index <= 16'd0;
             state           <= STATE_LOAD_BIAS;
           end
         end
 
         // Write Biases into UB (Offsets past Inputs and Weights)
-        STATE_LOAD_BIAS: begin
+        STATE_LOAD_BIAS: begin  // 0x05 d_5
           if (bias_load_index < active_tile_outputs) begin
             if (bias_load_index + 1 < active_tile_outputs) begin
               if (!current_layer) begin

@@ -12,9 +12,10 @@ from PIL import Image
 # CONFIGURATION
 # ---------------------------------------------------------------------------
 MNIST_IMAGES_FILE = "data/train-images.idx3-ubyte"  # raw MNIST image file
-OUTPUT_JPEG       = "data/mnist_digit.jpg"                # JPEG preview
-OUTPUT_HEADER     = "data/mnist_image_data.h"              # C header for test_main.cpp
-DIGIT_INDEX       = 31                                  # which image to extract (0..59999)
+OUTPUT_JPEG       = "data/mnist_digit.jpg"          # JPEG preview
+OUTPUT_HEADER     = "data/mnist_image_data.h"       # C header for test_main.cpp
+OUTPUT_MEMH       = "data/mnist_image_data.memh"    # Verilog hex memory file
+DIGIT_INDEX       = 31                              # which image to extract (0..59999)
 
 # ---------------------------------------------------------------------------
 # Read MNIST IDX file format
@@ -80,3 +81,22 @@ with open(OUTPUT_HEADER, 'w') as f:
     f.write("#endif // MNIST_IMAGE_DATA_H\n")
 
 print(f"Generated C header: {OUTPUT_HEADER}")
+
+# ---------------------------------------------------------------------------
+# Generate Verilog .memh file
+# Hex string representations for use with $readmemh()
+# ---------------------------------------------------------------------------
+with open(OUTPUT_MEMH, 'w') as f:
+    # Add an optional comment at the top
+    f.write(f"// MNIST Image #{DIGIT_INDEX} - Q8.8 fixed-point format\n")
+    
+    for pixel in img.flatten():
+        # Normalize 0-255 → 0.0-1.0, then Q8.8: multiply by 256
+        q8_8 = int(round(pixel * 256.0 / 255.0))
+        if q8_8 > 32767: q8_8 = 32767
+        if q8_8 < -32768: q8_8 = -32768
+        
+        # Write exactly 4 hex digits, one per line (no "0x" prefix for .memh)
+        f.write(f"{q8_8 & 0xFFFF:04X}\n")
+
+print(f"Generated Verilog memh: {OUTPUT_MEMH}")

@@ -65,7 +65,8 @@ static const int CLK_PERIOD_PS = 10000;
 static const int PIXELS = 784;
 static const int HIDDEN_NEURONS = 64;
 static const int OUTPUT_NEURONS = 10;
-static const uint64_t MAX_SIM_TIME = 100000000;
+static const uint64_t MAX_SIM_TIME = 800000000;
+static const int TILE_SIZE = 2;
 
 // FSM State names
 static const char* state_names[] = {
@@ -150,33 +151,63 @@ static void compute_expected_outputs() {
     TB_LOG(LOG_MED, "[TB] Computing C++ Expected Outputs..." << std::endl);
     
     // Layer 0
-    for (int h = 0; h < HIDDEN_NEURONS; h++) {
-        int h_tile = h / 2;
-        int h_rem = h % 2;
-        int16_t acc = 0;
-        for (int p = 0; p < PIXELS; p++) {
-            int w_idx = (h_tile * PIXELS * 2) + (p * 2) + h_rem;
+    //     int h_tile = h / TILE_SIZE; // Total tiles
+    // int h_rem = h % TILE_SIZE; // Position within tile (0 or 1)
+    int16_t acc0 = 0, acc1 = 0, acc = 0;
+    // for (int p = 0; p < PIXELS; p++) {
+    int w_base = 0;
+    int h = 0;
+    int h_tile = 0;
+    int p2 =0, p = 0;
+    int w_idx = 0;
+    for (h = 0; h < HIDDEN_NEURONS; h+=2) {
+        // w_ofset 0 ... 1567 (for TILE_SIZE=2)
+        for (int w_ofset = 0; w_ofset < (PIXELS * TILE_SIZE); w_ofset++) {
+            w_idx = w_base + w_ofset;
+            // for (p2 = 0; p2 < (PIXELS * TILE_SIZE); p2++) {
+            p = w_ofset / TILE_SIZE; // p from 0 to 783
             int16_t prod = q8_8_mul(mnist_test_image[p], w1_mem[w_idx]);
-            acc = sat_add(acc, prod);
-            
-            // LOG_HIGH: Only prints if verbosity is set to 3
-            TB_LOG(LOG_HIGH, "[TB L0] Neuron " << h << ", Pixel " << p << ":" << std::endl
-                           << "        mnist_test_image[" << p << "] (" << fmt_16(mnist_test_image[p]) 
-                           << ") * w1_mem[" << w_idx << "] (" << fmt_16(w1_mem[w_idx]) 
-                           << ") = " << fmt_16(prod) << std::endl
-                           << "        Accumulator after adding product: " << fmt_16(acc) << std::endl);
+            // TODO (IF TIME): Below if-else doesn't work for TILE_SIZE > 2
+            if (w_idx % TILE_SIZE == 0) {
+                acc0 = sat_add(acc0, prod);                  
+                h_tile = h;
+                acc = acc0;
+            }
+            else {
+                acc1 = sat_add(acc1, prod);
+                h_tile = h + 1;
+                acc = acc1;
+            }
+                        
+            TB_LOG(LOG_HIGH, "[TB L0] Neuron " << h_tile << std::endl
+                        << "        mnist_test_image[" << p << "] (" << fmt_16(mnist_test_image[p]) 
+                        << ") * w1_mem[w_idx" << w_idx << " W" << h_tile << "_" << p << "] (" 
+                        << fmt_16(w1_mem[w_idx]) << ") = " << fmt_16(prod) << std::endl
+                        << "        Acc" << w_idx%TILE_SIZE << ": " << fmt_16(acc) << std::endl);
             TB_LOG_PAUSE(LOG_HIGH);
+            if (w_idx % TILE_SIZE == 1) h_tile--; // only for printing
+            // }
         }
 
-        int16_t acc_pre_RELU = sat_add(acc, b1_mem[h]);
-        if (acc_pre_RELU < 0) acc = acc_pre_RELU*0.5;
-        else acc = acc_pre_RELU;
-        expected_hidden[h] = acc;
+        int16_t acc0_pre_RELU = sat_add(acc0, b1_mem[h]);
+        int16_t acc1_pre_RELU = sat_add(acc1, b1_mem[h+1]);
+        if (acc0_pre_RELU < 0) acc0 = acc0_pre_RELU*0.5;
+        else acc0 = acc0_pre_RELU;
+        if (acc1_pre_RELU < 0) acc1 = acc1_pre_RELU*0.5;
+        else acc1 = acc1_pre_RELU;
 
-        TB_LOG(LOG_HIGH, "[TB L0] Neuron " << h << ": acc " << fmt_16(acc_pre_RELU) << " + bias b1_mem[" 
+        expected_hidden[h] = acc0;
+        expected_hidden[h+1] = acc1;
+
+        TB_LOG(LOG_MED, "[TB L0] Weights processed: " << w_idx+1 << std::endl);
+        TB_LOG(LOG_MED, "[TB L0] Neuron " << h << ": acc0 " << fmt_16(acc0_pre_RELU) << " + bias b1_mem[" 
                         << h << "] " << fmt_16(b1_mem[h]) << " and ReLU (0.5) = " << fmt_16(expected_hidden[h]) 
                         << std::endl);
-        TB_LOG_PAUSE(LOG_HIGH);
+        TB_LOG(LOG_MED, "[TB L0] Neuron " << h+1 << ": acc1 " << fmt_16(acc1_pre_RELU) << " + bias b1_mem[" 
+                        << h+1 << "] " << fmt_16(b1_mem[h+1]) << " and ReLU (0.5) = " << fmt_16(expected_hidden[h+1]) 
+                        << std::endl);
+        TB_LOG_PAUSE(LOG_MED);
+        w_base += (PIXELS * TILE_SIZE); // Move to next tile's weights in w1_mem
     }
 
     // Layer 1
@@ -200,9 +231,9 @@ static void compute_expected_outputs() {
         acc = sat_add(acc, b2_mem[o]);
         expected_logits[o] = acc;
 
-        TB_LOG(LOG_HIGH, "[TB L1] Output " << o << " Accumulator + bias b2_mem[" 
+        TB_LOG(LOG_MED, "[TB L1] Output " << o << " Accumulator + bias b2_mem[" 
             << o << "] (" << fmt_16(b2_mem[o]) << ") = " << fmt_16(acc) << std::endl);
-        TB_LOG_PAUSE(LOG_HIGH);
+        TB_LOG_PAUSE(LOG_MED);
     }
     
     TB_LOG(LOG_LOW, "[TB] C++ Reference Computation Complete." << std::endl);
@@ -276,8 +307,12 @@ int main(int argc, char** argv) {
     load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/b2_q8_8.memh", b2_mem);
     TB_LOG(LOG_LOW, "[TB] All weights and biases loaded successfully." << std::endl);
     
-    // 2. Compute C++ Golden Reference
+    // 2. Get Golden Reference
     compute_expected_outputs();
+
+    // load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/sample_expected_hidden_0_q8_8.memh", hidden_expected_mem);
+    // load_memh("/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/model/reference/sample_expected_logits_0_q8_8.memh", logits_expected_mem);
+    // TB_LOG(LOG_LOW, "[TB] Loaded Reference Values: " << hidden_expected_mem.size() << " Hidden Buffer, " << logits_expected_mem.size() << " Logits." << std::endl);
 
     top->clk = 0;
     top->rst = 1;
@@ -325,7 +360,7 @@ int main(int argc, char** argv) {
                     if (hidden_checked_count < HIDDEN_NEURONS) {
                         int16_t exp_val = expected_hidden[hidden_checked_count];
                         if (hw_val != exp_val) {
-                            if (hidden_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
+                            TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
                                 << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
                                 << cycle_count << std::endl);
                             hidden_errors++;
@@ -353,7 +388,7 @@ int main(int argc, char** argv) {
                     if (hidden_checked_count < HIDDEN_NEURONS) {
                         int16_t exp_val = expected_hidden[hidden_checked_count];
                         if (hw_val != exp_val) {
-                            if (hidden_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
+                            TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
                                 << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
                                 << cycle_count << std::endl);
                             hidden_errors++;

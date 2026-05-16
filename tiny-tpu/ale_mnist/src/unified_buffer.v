@@ -239,7 +239,7 @@ module unified_buffer #(
       // Initialize read pointers based on ub_rd_start_in signal
       if (ub_rd_start_in) begin
         case (ub_ptr_select)
-          0: begin
+          0: begin  // input data pathway left side of systolic array
             rd_input_transpose <= ub_rd_transpose;
             rd_input_ptr       <= ub_rd_addr_in;
 
@@ -253,7 +253,7 @@ module unified_buffer #(
 
             rd_input_time_counter <= 16'b0;
           end
-          1: begin
+          1: begin  // weight data pathway top of systolic array
             rd_weight_transpose <= ub_rd_transpose;
 
             if (ub_rd_transpose) begin
@@ -272,7 +272,7 @@ module unified_buffer #(
             rd_weight_time_counter   <= 16'b0;
             ub_rd_col_size_valid_out <= 1'b1;
           end
-          2: begin
+          2: begin  // bias data pathway to bias modules in VPU
             rd_bias_ptr          <= ub_rd_addr_in;
             rd_bias_row_size     <= ub_rd_row_size;
             rd_bias_col_size     <= ub_rd_col_size;
