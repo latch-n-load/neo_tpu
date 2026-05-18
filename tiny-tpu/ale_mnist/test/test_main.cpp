@@ -90,6 +90,23 @@ std::vector<int16_t> expected_hidden(HIDDEN_NEURONS, 0);
 std::vector<int16_t> expected_logits(OUTPUT_NEURONS, 0);
 
 // ==============================================================================
+// Hardware Array Extraction Helpers
+// Verilator packs wide buses (>64 bits) into uint32_t arrays.
+// These functions extract the 16-bit integers out of the 32-bit chunks.
+// ==============================================================================
+int16_t get_hw_hidden(int index) {
+    uint32_t chunk = top->debug_hidden_buffer[index / 2];
+    int shift = (index % 2) * 16;
+    return (int16_t)((chunk >> shift) & 0xFFFF);
+}
+
+int16_t get_hw_logit(int index) {
+    uint32_t chunk = top->debug_logits_buffer[index / 2];
+    int shift = (index % 2) * 16;
+    return (int16_t)((chunk >> shift) & 0xFFFF);
+}
+
+// ==============================================================================
 // Q8.8 Math Utilities
 // ==============================================================================
 static int16_t sat_add(int16_t a, int16_t b) {
@@ -351,17 +368,31 @@ int main(int argc, char** argv) {
             // 3. RUNTIME VPU STREAM CHECKING (Bypass DONE signal)
             // ------------------------------------------------------------------
             uint8_t current_layer = top->debug_current_layer;
+            uint8_t current_state = top->debug_state;
+            uint8_t hidden_tile_index    = top->debug_hidden_tile;
+            uint8_t output_tile_index    = top->debug_output_tile;
 
             // Check Channel 1
-            if (top->debug_vpu_valid_1) {
-                int16_t hw_val = (int16_t)top->debug_vpu_out_1;
+            // if (top->debug_vpu_valid_1) {
+            //     int16_t hw_val = (int16_t)top->debug_vpu_out_1;
+            // Check if the FSM just finished finalizing a tile for Layer 1
+            if (current_state == 12) { // 12 = STATE_NEXT_TILE
 
                 if (current_layer == 0) {
+                    int16_t hw_val0 = (int16_t)get_hw_hidden(hidden_tile_index);
+                    int16_t hw_val1 = (int16_t)get_hw_hidden(hidden_tile_index + 1);
                     if (hidden_checked_count < HIDDEN_NEURONS) {
-                        int16_t exp_val = expected_hidden[hidden_checked_count];
-                        if (hw_val != exp_val) {
+                        int16_t exp_val0 = expected_hidden[hidden_checked_count];
+                        int16_t exp_val1 = expected_hidden[hidden_checked_count + 1];
+                        if (hw_val0 != exp_val0) {
                             TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
-                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << "] HW: " << fmt_16(hw_val0) << " | EXP: " << fmt_16(exp_val0) << " @ cycle " 
+                                << cycle_count << std::endl);
+                            hidden_errors++;
+                        }
+                        if (hw_val1 != exp_val1) {
+                            TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count + 1 
+                                << "] HW: " << fmt_16(hw_val1) << " | EXP: " << fmt_16(exp_val1) << " @ cycle " 
                                 << cycle_count << std::endl);
                             hidden_errors++;
                         }
@@ -370,9 +401,18 @@ int main(int argc, char** argv) {
                 } else {
                     if (logits_checked_count < OUTPUT_NEURONS) {
                         int16_t exp_val = expected_logits[logits_checked_count];
-                        if (hw_val != exp_val) {
+                        // int16_t hw_val = (int16_t)top->logits_buffer[logits_checked_count];
+                        int16_t hw_val0 = (int16_t)get_hw_logit(output_tile_index);
+                        int16_t hw_val1 = (int16_t)get_hw_logit(output_tile_index + 1);
+                        if (hw_val0 != exp_val) {
                             if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
-                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << "] HW: " << fmt_16(hw_val0) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+                                << cycle_count << std::endl);
+                            logit_errors++;
+                        }
+                        if (hw_val1 != exp_val) {
+                            if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
+                                << "] HW: " << fmt_16(hw_val1) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
                                 << cycle_count << std::endl);
                             logit_errors++;
                         }
@@ -381,33 +421,33 @@ int main(int argc, char** argv) {
                 }
             }
 
-            // Check Channel 2
-            if (top->debug_vpu_valid_2) {
-                int16_t hw_val = (int16_t)top->debug_vpu_out_2;
-                if (current_layer == 0) {
-                    if (hidden_checked_count < HIDDEN_NEURONS) {
-                        int16_t exp_val = expected_hidden[hidden_checked_count];
-                        if (hw_val != exp_val) {
-                            TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
-                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
-                                << cycle_count << std::endl);
-                            hidden_errors++;
-                        }
-                        hidden_checked_count++;
-                    }
-                } else {
-                    if (logits_checked_count < OUTPUT_NEURONS) {
-                        int16_t exp_val = expected_logits[logits_checked_count];
-                        if (hw_val != exp_val) {
-                            if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
-                                << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
-                                << cycle_count << std::endl);
-                            logit_errors++;
-                        }
-                        logits_checked_count++;
-                    }
-                }
-            }
+            // // Check Channel 2
+            // if (top->debug_vpu_valid_2) {
+            //     int16_t hw_val = (int16_t)top->debug_vpu_out_2;
+            //     if (current_layer == 0) {
+            //         if (hidden_checked_count < HIDDEN_NEURONS) {
+            //             int16_t exp_val = expected_hidden[hidden_checked_count];
+            //             if (hw_val != exp_val) {
+            //                 TB_LOG(LOG_LOW, "[FAIL] L0 Hidden[" << hidden_checked_count 
+            //                     << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+            //                     << cycle_count << std::endl);
+            //                 hidden_errors++;
+            //             }
+            //             hidden_checked_count++;
+            //         }
+            //     } else {
+            //         if (logits_checked_count < OUTPUT_NEURONS) {
+            //             int16_t exp_val = expected_logits[logits_checked_count];
+            //             if (hw_val != exp_val) {
+            //                 if (logit_errors < 10) TB_LOG(LOG_LOW, "[FAIL] L1 Logit[" << logits_checked_count 
+            //                     << "] HW: " << fmt_16(hw_val) << " | EXP: " << fmt_16(exp_val) << " @ cycle " 
+            //                     << cycle_count << std::endl);
+            //                 logit_errors++;
+            //             }
+            //             logits_checked_count++;
+            //         }
+            //     }
+            // }
 
             // Check if we have collected all expected data
             if (hidden_checked_count >= HIDDEN_NEURONS && logits_checked_count >= OUTPUT_NEURONS) {
