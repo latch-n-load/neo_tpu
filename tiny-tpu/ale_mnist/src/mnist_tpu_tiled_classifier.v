@@ -1,7 +1,11 @@
 // ==============================================================================
 // MODULE: mnist_tpu_tiled_classifier
-// Last Status: Found only first 4 weights and
 //
+// Last Status: Contains relevant modifications to mnist_tpu_tiled_classifier to
+// pass test image and weights, for verilator simulation. 
+// FSM is NOT CAPABLE of fully calculating 2 Neurons and beyond.
+//
+// Last Update: 2026-05-16
 
 // SUMMARY:
 // This module implements a highly optimized, hardware-accelerated Multilayer 
