@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Mon May 11 23:58:55 2026
+[*] Sun May 17 11:36:00 2026
 [*]
 [dumpfile] "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/waveforms/mnist_tpu_classifier.vcd"
-[dumpfile_mtime] "Mon May 11 23:51:59 2026"
-[dumpfile_size] 1049428
+[dumpfile_mtime] "Sun May 17 11:14:19 2026"
+[dumpfile_size] 22692369
 [savefile] "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/waveforms/mnist_tpu_classifier.gtkw"
-[timestart] 15773500
+[timestart] 16053500
 [size] 1920 1032
 [pos] -1 -1
-*-14.308421 15830000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-14.308421 16120000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] TOP.
 [treeopen] TOP.mnist_tpu_tiled_classifier_tb.
 [treeopen] TOP.mnist_tpu_tiled_classifier_tb.dut.
@@ -27,12 +27,14 @@ TOP.mnist_tpu_tiled_classifier_tb.dut.rst
 TOP.mnist_tpu_tiled_classifier_tb.dut.pixel_data_in[15:0]
 @28
 TOP.mnist_tpu_tiled_classifier_tb.dut.start
-@23
+@22
 TOP.mnist_tpu_tiled_classifier_tb.dut.state[4:0]
 @28
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_rst
 @420
 TOP.mnist_tpu_tiled_classifier_tb.dut.weight_load_index[15:0]
+@23
+TOP.mnist_tpu_tiled_classifier_tb.dut.input_load_index[9:0]
 @28
 TOP.mnist_tpu_tiled_classifier_tb.dut.ub_wr_host_valid_in_0
 TOP.mnist_tpu_tiled_classifier_tb.dut.ub_wr_host_valid_in_1
@@ -58,6 +60,8 @@ TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_11[15
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_12[15:0]
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_in_11[15:0]
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_in_21[15:0]
+@c00200
+-pe_internal
 @200
 -pe11
 @22
@@ -89,6 +93,8 @@ TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_psum_in[15:
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_psum_out[15:0]
 @200
 -
+@1401200
+-pe_internal
 @40000420
 [fpshift_count] 8
 TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_out_21[15:0]

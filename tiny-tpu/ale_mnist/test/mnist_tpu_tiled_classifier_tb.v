@@ -15,25 +15,27 @@ module mnist_tpu_tiled_classifier_tb #(
     parameter integer TILE_WIDTH           = 2,
     parameter integer UNIFIED_BUFFER_WIDTH = 4096
 ) (
-    input  wire                         clk,
-    input  wire                         rst,
-    input  wire                         start,
-    input  wire [                 15:0] pixel_data_in,
-    output wire [ PIXEL_ADDR_WIDTH-1:0] pixel_addr_out,
-    output wire                         busy,
-    output wire                         done,
-    output wire [                  3:0] prediction_out,
+    input  wire                           clk,
+    input  wire                           rst,
+    input  wire                           start,
+    input  wire [                   15:0] pixel_data_in,
+    output wire [   PIXEL_ADDR_WIDTH-1:0] pixel_addr_out,
+    output wire                           busy,
+    output wire                           done,
+    output wire [                    3:0] prediction_out,
     // Debug outputs
-    output wire [                  4:0] debug_state,
-    output wire                         debug_current_layer,
-    output wire [HIDDEN_ADDR_WIDTH-1:0] debug_hidden_tile,
-    output wire [OUTPUT_ADDR_WIDTH-1:0] debug_output_tile,
-    output wire [                 15:0] debug_vpu_out_1,
-    output wire [                 15:0] debug_vpu_out_2,
-    output wire                         debug_vpu_valid_1,
-    output wire                         debug_vpu_valid_2,
-    output wire                         debug_sys_switch,
-    output wire                         debug_tpu_rst
+    output wire [                    4:0] debug_state,
+    output wire                           debug_current_layer,
+    output wire [  HIDDEN_ADDR_WIDTH-1:0] debug_hidden_tile,
+    output wire [  OUTPUT_ADDR_WIDTH-1:0] debug_output_tile,
+    output wire [                   15:0] debug_vpu_out_1,
+    output wire [                   15:0] debug_vpu_out_2,
+    output wire                           debug_vpu_valid_1,
+    output wire                           debug_vpu_valid_2,
+    output wire                           debug_sys_switch,
+    output wire                           debug_tpu_rst,
+    output wire [(HIDDEN_NEURONS*16)-1:0] debug_hidden_buffer,
+    output wire [(OUTPUT_NEURONS*16)-1:0] debug_logits_buffer
 );
 
   mnist_tpu_tiled_classifier #(
@@ -68,6 +70,17 @@ module mnist_tpu_tiled_classifier_tb #(
   assign debug_vpu_valid_2   = dut.vpu_valid_out_2;
   assign debug_sys_switch    = dut.sys_switch_in;
   assign debug_tpu_rst       = dut.tpu_rst;
+
+  // Map internal DUT array elements to the flattened 1D output ports
+  genvar i;
+  generate
+    for (i = 0; i < HIDDEN_NEURONS; i = i + 1) begin : gen_hidden
+      assign debug_hidden_buffer[i*16+:16] = dut.hidden_buffer[i];
+    end
+    for (i = 0; i < OUTPUT_NEURONS; i = i + 1) begin : gen_logits
+      assign debug_logits_buffer[i*16+:16] = dut.logits_buffer[i];
+    end
+  endgenerate
 
 endmodule
 
