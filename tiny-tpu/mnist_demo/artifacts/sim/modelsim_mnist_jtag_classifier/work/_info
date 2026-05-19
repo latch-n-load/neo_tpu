@@ -1,51 +1,56 @@
 m255
 K4
 z2
+!s11f vlog 2020.1 2020.02, Feb 28 2020
 13
 !s112 1.1
 !i10d 8192
 !i10e 25
 !i10f 100
 cModel Technology
-Z0 d//wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/sim/modelsim_mnist_jtag_classifier
+Z0 d/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/artifacts/sim/modelsim_mnist_jtag_classifier
 vbias_child
-Z1 !s110 1773642163
+Z1 !s110 1779230583
 !i10b 1
-!s100 DnZ;Fb_[H^23H@Lc@:iGB3
-ID>a84nz122;h8WlLYL^T93
-Z2 VDg1SIo80bB@j0V0VzS_@n1
+!s100 MSbNQ@aF^5Qmc<4S63@jW1
+Z2 !s11b Dg1SIo80bB@j0V0VzS_@n1
+ITV8hRUl5F8fXoA5<Ij6]R1
+Z3 VDg1SIo80bB@j0V0VzS_@n1
 R0
-Z3 w1772342862
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_child.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_child.v
-L0 4
-Z4 OV;L;10.5b;63
+Z4 w1776800367
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v
+!i122 0
+L0 4 37
+Z5 OV;L;2020.1;71
 r1
 !s85 0
 31
-Z5 !s108 1773642162.000000
-Z6 !s107 \\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\sim\tb_mnist_jtag_classifier.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_jtag_mmio.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_classifier_core.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\tpu_mnist.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\pe.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\gradient_descent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\vpu.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\systolic.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\unified_buffer.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\fixedpoint_simple.v|
-Z7 !s90 -work|work|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\fixedpoint_simple.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\unified_buffer.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\systolic.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\vpu.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_child.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_parent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\gradient_descent.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\pe.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\tpu_mnist.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_classifier_core.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_jtag_mmio.v|\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\sim\tb_mnist_jtag_classifier.v|
+Z6 !s108 1779230583.000000
+!s107 /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/sim/tb_mnist_jtag_classifier.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_jtag_mmio.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_classifier_core.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/tpu_mnist.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/pe.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/gradient_descent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/vpu.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/systolic.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/unified_buffer.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/fixedpoint_simple.v|
+Z7 !s90 -work|work|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/fixedpoint_simple.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/unified_buffer.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/systolic.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/vpu.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/gradient_descent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/pe.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/tpu_mnist.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_classifier_core.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_jtag_mmio.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/sim/tb_mnist_jtag_classifier.v|
 !i113 1
-Z8 o-work work -L mtiAvm -L mtiRnm -L mtiOvm -L mtiUvm -L mtiUPF -L infact
+Z8 o-work work
 Z9 tCvgOpt 0
 vbias_parent
 R1
 !i10b 1
-!s100 f9CJd`6DmGCQNiDPTjhJb1
-I4EWGoQfjD5Nh^4]59`Cz_3
+!s100 @N]k41:cg8?mX_;_aOGaC3
 R2
-R0
+IEBQWjoPAoWomJ61zZib`o0
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_parent.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\bias_parent.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_parent.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_parent.v
+!i122 0
+Z10 L0 4 44
+R5
 r1
 !s85 0
 31
-R5
 R6
+Z11 !s107 /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/sim/tb_mnist_jtag_classifier.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_jtag_mmio.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_classifier_core.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/tpu_mnist.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/pe.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/gradient_descent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_parent.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/vpu.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/systolic.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/unified_buffer.v|/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/fixedpoint_simple.v|
 R7
 !i113 1
 R8
@@ -53,20 +58,22 @@ R9
 vfxp_add
 R1
 !i10b 1
-!s100 f[l0c=^[ebWM5:0PJKF`73
-I=H5=8IUK_zKdnLBX>DK[o0
+!s100 P0l8;hTZR902Z?]E@?BB20
 R2
-R0
+IjO1WcQIDUba;Vo7;le[5X0
 R3
-Z10 8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\fixedpoint_simple.v
-Z11 F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\fixedpoint_simple.v
-L0 8
+R0
 R4
+Z12 8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/fixedpoint_simple.v
+Z13 F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/fixedpoint_simple.v
+!i122 0
+L0 8 28
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -74,20 +81,22 @@ R9
 vfxp_addsub
 R1
 !i10b 1
-!s100 bKTO]RmO0`WF;Z@YMZcff3
-Io871=X@cE_SCI[H8SfzHG3
+!s100 Ka]d[mg3757;AEnoLBdE<1
 R2
-R0
+IeeN=<_4a_<2e<S:CU?=z23
 R3
-R10
-R11
-L0 69
+R0
 R4
+R12
+R13
+!i122 0
+L0 69 31
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -95,20 +104,22 @@ R9
 vfxp_mul
 R1
 !i10b 1
-!s100 IY>=g[IgMNZzj4GMXQHJ<3
-IFLFefKXIYO0h0o2C8XJZC0
+!s100 Kan6IFW6H5PgP@YY<:[gO0
 R2
-R0
+IOjMhA9Vf0adO^Q[zOkO9k1
 R3
-R10
-R11
-L0 38
+R0
 R4
+R12
+R13
+!i122 0
+L0 38 29
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -116,20 +127,22 @@ R9
 vgradient_descent
 R1
 !i10b 1
-!s100 agS0^^JHVP]CVfDULBAKG1
-ICD]`dWjX<5:e8fB4aFPaI2
+!s100 85=P5^7mX9OVGN2o5B]7<0
 R2
-R0
+I[MA@@L9:4]N:8`gD60NPD1
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\gradient_descent.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\gradient_descent.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/gradient_descent.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/gradient_descent.v
+!i122 0
+L0 4 76
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -137,20 +150,22 @@ R9
 vleaky_relu_child
 R1
 !i10b 1
-!s100 K`dc5MfjgdheGaLagThnA2
-I7=033=ezcToYef3zgbR^K2
+!s100 I^m6aliRPo8I@1]YZzl@:2
 R2
-R0
+Ioa:Xb5<N9a8K^o4WaL6<L3
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_child.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_child.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v
+!i122 0
+L0 4 41
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -158,20 +173,22 @@ R9
 vleaky_relu_derivative_child
 R1
 !i10b 1
-!s100 L0jAnnU=W=4h_U>39hXUd3
-IBaJ]23R9<BdFiLKoH`>WV1
+!s100 icflQElmWGjZ1JU5`kURm0
 R2
-R0
+I]5BV:^P=i?9733:PJ@A5<3
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_child.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_child.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v
+!i122 0
+L0 4 40
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -179,20 +196,22 @@ R9
 vleaky_relu_derivative_parent
 R1
 !i10b 1
-!s100 kgK6CfGg;=ijaYLmmR8Vl3
-I>7BJ3b;m9Yo0ad4lSkhdE3
+!s100 Udd2Z5XdD=i4ff7NdcGO41
 R2
-R0
+IT;OROS8c_b48zRA1b>9Zj3
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_parent.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_derivative_parent.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_parent.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_parent.v
+!i122 0
+R10
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -200,20 +219,22 @@ R9
 vleaky_relu_parent
 R1
 !i10b 1
-!s100 9j<n@:XPGeLdjk]zY:>]U3
-I]Dl;KLY6zFKaI@a[LbCdA3
+!s100 RFPLUCR@6EHBF8E3@YgXz3
 R2
-R0
+IB=[ZmbnA=aODFlfnCf12C2
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_parent.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\leaky_relu_parent.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_parent.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_parent.v
+!i122 0
+L0 4 39
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -221,20 +242,22 @@ R9
 vloss_child
 R1
 !i10b 1
-!s100 @8=YbHgU>zTBYF?IFoNgh2
-Ibn<fLbZ;Pn`UF7PWm]LYi2
+!s100 KO?`c=@Z=O;D8k8EZ>nma0
 R2
-R0
+IQ`U5UAzI[z^;5PCLjKYKn0
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_child.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_child.v
-L0 6
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_child.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_child.v
+!i122 0
+L0 6 47
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -242,20 +265,22 @@ R9
 vloss_parent
 R1
 !i10b 1
-!s100 X:^YVJflOCWooiFTW3Rd=1
-IGBc7`ij4z>Sl^2f2oQI[B3
+!s100 m7`=7l?OTWMEdHzj=dT[=3
 R2
-R0
+IfNVodBGMWgOH?RobK:VJV0
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_parent.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\loss_parent.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_parent.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/loss_parent.v
+!i122 0
+L0 4 45
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -263,20 +288,22 @@ R9
 vmnist_classifier_core
 R1
 !i10b 1
-!s100 0]YFoVgc2QlknJOK`9Tbm0
-IIbHM57nbN2[_`Q3na]]S?3
+!s100 h`OGlQLC;J]EkS3AS4iL;1
 R2
+IOLO:dSzh;?;^C9IgN[ome1
+R3
 R0
-Z12 w1772345418
-Z13 8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_classifier_core.v
-Z14 F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_classifier_core.v
-L0 29
-R4
+Z14 w1778001660
+Z15 8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_classifier_core.v
+Z16 F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_classifier_core.v
+!i122 0
+L0 55 807
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -284,20 +311,22 @@ R9
 vmnist_jtag_mmio
 R1
 !i10b 1
-!s100 S1nYN;Bz[[6kDLLG<0Ig42
-I7QnPmWg1D>GJ59^dS9F8>2
+!s100 =BZU7OnEb4a^?^J=1Y=B31
 R2
+IOz6BZA`R`Z42UC::DNeSM3
+R3
 R0
-w1772931110
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_jtag_mmio.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\mnist_jtag_mmio.v
-L0 7
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_jtag_mmio.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/mnist_jtag_mmio.v
+!i122 0
+L0 7 146
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -305,20 +334,22 @@ R9
 vmnist_sync_rom_2r
 R1
 !i10b 1
-!s100 2Z35B07_Ro2A:SbE2XMHY3
-Iz;:Bogeh0G?a24ZUVAMGD3
+!s100 9DchBN6HH37I?jRGOCY`F3
 R2
+Ie7GZoDl>9fEJc`J[0i<kE0
+R3
 R0
-R12
-R13
 R14
-L0 7
-R4
+R15
+R16
+!i122 0
+L0 27 24
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -326,20 +357,22 @@ R9
 vpe
 R1
 !i10b 1
-!s100 ZZDiTK]]X=k6hd;IDS8E<0
-IP9RV_81IdHTEmc[;1P9IU3
+!s100 ]KB1P[h;oMUV`:O5=77To1
 R2
-R0
+IEO>KZQeJHF7d5eVb^5>Te1
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\pe.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\pe.v
-L0 4
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/pe.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/pe.v
+!i122 0
+L0 4 94
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -347,20 +380,22 @@ R9
 vsystolic
 R1
 !i10b 1
-!s100 DMa2C53NPJNKGRieXPK0E3
-I3al?5KH`lCF17^h>A96:?2
+!s100 9[]EhU21[_21YTVO0<@UC3
 R2
-R0
+I>XRI`bzH6h22Xld@0gA4J0
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\systolic.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\systolic.v
-L0 5
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/systolic.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/systolic.v
+!i122 0
+L0 5 142
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -368,20 +403,22 @@ R9
 vtb_mnist_jtag_classifier
 R1
 !i10b 1
-!s100 ><hg3>6i1gV6W^8Be3eKN3
-IMM?kTS4fCRc67G^fHln_?3
+!s100 bhl2f`l@>L[;9DHM8J1XE0
 R2
+IBM0:4zK:5HP=hNTa^aaZ;3
+R3
 R0
-w1772943592
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\sim\tb_mnist_jtag_classifier.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\sim\tb_mnist_jtag_classifier.v
-L0 7
-R4
+w1779218775
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/sim/tb_mnist_jtag_classifier.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/sim/tb_mnist_jtag_classifier.v
+!i122 0
+L0 7 229
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -389,20 +426,22 @@ R9
 vtpu_mnist
 R1
 !i10b 1
-!s100 fWgeP3;^Se9_?KPZI5mI`0
-Ib@?5oK3PW1gA=efXCVi>o2
+!s100 JRRzjL6Z8Cen1Rhai4[Ye0
 R2
+I<U21ggi@k@U<Bj>K_cF1:2
+R3
 R0
-w1772341163
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\tpu_mnist.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\tpu_mnist.v
-L0 7
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/tpu_mnist.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/tpu_mnist.v
+!i122 0
+L0 7 142
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -410,20 +449,22 @@ R9
 vunified_buffer
 R1
 !i10b 1
-!s100 z9CH][9mD2SY@kzKfM`hX0
-IIE6z2VVZ?7:[:ED3InW6?2
+!s100 ffK1XB<E9gXj45AU6QF1b2
 R2
-R0
+I:nZP[UCGMTYn[2JSYl]Oc1
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\unified_buffer.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\unified_buffer.v
-L0 6
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/unified_buffer.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/unified_buffer.v
+!i122 0
+L0 6 656
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
@@ -431,20 +472,22 @@ R9
 vvpu
 R1
 !i10b 1
-!s100 HMn=5Z5>fTj<KYXi^X`mg0
-IKU6UD1=J=CQ7PB@zij>ed1
+!s100 f@iNfifaSVNGbbR?;>>L91
 R2
-R0
+I:[O4CFNYzWaT^6:cD7Mj00
 R3
-8\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\vpu.v
-F\\wsl.localhost\Ubuntu\home\surya\tiny-tpu\de1_soc_mnist_demo\rtl\vpu.v
-L0 19
+R0
 R4
+8/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/vpu.v
+F/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/vpu.v
+!i122 0
+L0 19 351
+R5
 r1
 !s85 0
 31
-R5
 R6
+R11
 R7
 !i113 1
 R8
