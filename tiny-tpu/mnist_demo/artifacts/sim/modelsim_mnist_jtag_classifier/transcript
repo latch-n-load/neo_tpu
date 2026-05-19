@@ -1,5 +1,5 @@
 # vsim -c -do "run -all; quit -f" work.tb_mnist_jtag_classifier 
-# Start time: 00:43:04 on May 20,2026
+# Start time: 00:56:39 on May 20,2026
 # Loading work.tb_mnist_jtag_classifier
 # Loading work.mnist_jtag_mmio
 # Loading work.mnist_classifier_core
@@ -42,5 +42,5 @@
 # run -all
 # PASS: jtag mmio + classifier predicted expected digit 8 (cycles=304983),
 #             total time = 306566
-# End time: 00:43:11 on May 20,2026, Elapsed time: 0:00:07
+# End time: 00:56:46 on May 20,2026, Elapsed time: 0:00:07
 # Errors: 0, Warnings: 12

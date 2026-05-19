@@ -3,3 +3,4 @@
 results.xml
 /test/__pycache__/
 /.venv/
+/mnist_demo/artifacts/sim/*/work
