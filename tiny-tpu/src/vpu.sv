@@ -250,6 +250,7 @@ module vpu (
                 bias_valid_2_in = vpu_valid_in_2;
 
                 // connect bias output to intermediate values
+                // ale: connect bias_o to lr_i
                 b_to_lr_data_in_1 = bias_z_data_out_1;
                 b_to_lr_data_in_2 = bias_z_data_out_2;
                 b_to_lr_valid_in_1 = bias_valid_1_out;
@@ -262,6 +263,7 @@ module vpu (
                 bias_valid_2_in = 1'b0;
 
                 // connect vpu input to intermediate values
+                // ale: connect vpu_i to lr_i when bias is bypassed
                 b_to_lr_data_in_1 = vpu_data_in_1;
                 b_to_lr_data_in_2 = vpu_data_in_2;
                 b_to_lr_valid_in_1 = vpu_valid_in_1;
@@ -271,12 +273,14 @@ module vpu (
             // leaky relu module
             if(vpu_data_pathway[2]) begin
                 // connect lr inputs to intermediate values
+                // ale: connect lr_i to bias_o when lr is active
                 lr_data_1_in = b_to_lr_data_in_1;
                 lr_data_2_in = b_to_lr_data_in_2;
                 lr_valid_1_in = b_to_lr_valid_in_1;
                 lr_valid_2_in = b_to_lr_valid_in_2;
 
                 // connect lr outputs to intermediate values
+                // ale: connect lr_o to loss_i when lr is active (CONNECTED with 1100)
                 lr_to_loss_data_in_1 = lr_data_1_out;
                 lr_to_loss_data_in_2 = lr_data_2_out;
                 lr_to_loss_valid_in_1 = lr_valid_1_out;
@@ -290,6 +294,7 @@ module vpu (
                 lr_valid_2_in = 1'b0;
 
                 // connect intermediate values to each other
+                // ale: else connect bias_o to loss_i directly when lr is bypassed
                 lr_to_loss_data_in_1 = b_to_lr_data_in_1;
                 lr_to_loss_data_in_2 = b_to_lr_data_in_2;
                 lr_to_loss_valid_in_1 = b_to_lr_valid_in_1;
@@ -323,6 +328,7 @@ module vpu (
                 loss_valid_2_in = 1'b0;
 
                 // connect intermediate values to each other
+                // ale: else connect lr_o to lrd_i directly when loss is bypassed (BYPASSED with 1100)
                 loss_to_lrd_data_in_1 = lr_to_loss_data_in_1;
                 loss_to_lrd_data_in_2 = lr_to_loss_data_in_2;
                 loss_to_lrd_valid_in_1 = lr_to_loss_valid_in_1;
@@ -356,6 +362,7 @@ module vpu (
                 lr_d_valid_2_in = 1'b0;
 
                 // bypass: connect intermediate values directly to vpu mux output
+                // ale: connect loss_o to vpu_o when lr_d is bypassed (BYPASSED with 1100)
                 vpu_data_mux_1 = loss_to_lrd_data_in_1;
                 vpu_data_mux_2 = loss_to_lrd_data_in_2;
                 vpu_valid_mux_1 = loss_to_lrd_valid_in_1;

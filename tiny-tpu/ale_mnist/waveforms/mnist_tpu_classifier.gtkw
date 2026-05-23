@@ -1,0 +1,117 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sun May 17 11:36:00 2026
+[*]
+[dumpfile] "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/waveforms/mnist_tpu_classifier.vcd"
+[dumpfile_mtime] "Sun May 17 11:14:19 2026"
+[dumpfile_size] 22692369
+[savefile] "/home/ale/tesi/tesi_git/tiny-tpu/ale_mnist/waveforms/mnist_tpu_classifier.gtkw"
+[timestart] 16053500
+[size] 1920 1032
+[pos] -1 -1
+*-14.308421 16120000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] TOP.
+[treeopen] TOP.mnist_tpu_tiled_classifier_tb.
+[treeopen] TOP.mnist_tpu_tiled_classifier_tb.dut.
+[treeopen] TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.
+[treeopen] TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.
+[sst_width] 360
+[signals_width] 423
+[sst_expanded] 1
+[sst_vpaned_height] 308
+@28
+TOP.mnist_tpu_tiled_classifier_tb.dut.clk
+TOP.mnist_tpu_tiled_classifier_tb.dut.rst
+@40000420
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.pixel_data_in[15:0]
+@28
+TOP.mnist_tpu_tiled_classifier_tb.dut.start
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.state[4:0]
+@28
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_rst
+@420
+TOP.mnist_tpu_tiled_classifier_tb.dut.weight_load_index[15:0]
+@23
+TOP.mnist_tpu_tiled_classifier_tb.dut.input_load_index[9:0]
+@28
+TOP.mnist_tpu_tiled_classifier_tb.dut.ub_wr_host_valid_in_0
+TOP.mnist_tpu_tiled_classifier_tb.dut.ub_wr_host_valid_in_1
+@40000420
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_wr_host_data_in_0[15:0]
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_wr_host_data_in_1[15:0]
+@200
+-
+-ub -> sys
+@24
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_rd_addr_in[15:0]
+@28
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_rd_start_in
+@40000420
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_11[15:0]
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_12[15:0]
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_11[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_weight_in_12[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_in_11[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_in_21[15:0]
+@c00200
+-pe_internal
+@200
+-pe11
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe11.pe_input_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe11.pe_weight_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe11.weight_reg_active[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe11.pe_psum_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe11.pe_psum_out[15:0]
+@200
+-pe12
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe12.pe_input_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe12.pe_weight_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe12.pe_psum_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe12.pe_psum_out[15:0]
+@200
+-pe21
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe21.pe_input_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe21.pe_weight_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe21.pe_psum_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe21.pe_psum_out[15:0]
+@200
+-pe22
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_input_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_weight_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_psum_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.pe22.pe_psum_out[15:0]
+@200
+-
+@1401200
+-pe_internal
+@40000420
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_out_21[15:0]
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.systolic_inst.sys_data_out_22[15:0]
+@200
+-
+-ub & sys -> vpu
+@40000022
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_rd_bias_data_out_0[15:0]
+[fpshift_count] 8
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.ub_rd_bias_data_out_1[15:0]
+@22
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.vpu_inst.bias_data_1_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.vpu_inst.bias_data_2_in[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.vpu_inst.bias_z_data_out_1[15:0]
+TOP.mnist_tpu_tiled_classifier_tb.dut.tpu_inst.vpu_inst.bias_z_data_out_2[15:0]
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,5 +1,5 @@
 # vsim -c -do "run -all; quit -f" work.tb_mnist_jtag_classifier 
-# Start time: 02:22:50 on Mar 16,2026
+# Start time: 00:56:39 on May 20,2026
 # Loading work.tb_mnist_jtag_classifier
 # Loading work.mnist_jtag_mmio
 # Loading work.mnist_classifier_core
@@ -21,25 +21,26 @@
 # Loading work.leaky_relu_derivative_parent
 # Loading work.leaky_relu_derivative_child
 # Loading work.mnist_sync_rom_2r
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/bias_child.v(18): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/bias_parent_inst/column_1/add_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/bias_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/bias_child.v(18): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/bias_parent_inst/column_2/add_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/bias_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_parent_inst/leaky_relu_col_1/mul_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Missing connection for port 'overflow'.
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_parent_inst/leaky_relu_col_2/mul_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Missing connection for port 'overflow'.
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_derivative_parent_inst/lr_d_col_1/mul_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
-# ** Warning: (vsim-3017) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Too few port connections. Expected 4, found 3.
-#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_derivative_parent_inst/lr_d_col_2/mul_inst File: //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/fixedpoint_simple.v
-# ** Warning: (vsim-3722) //wsl.localhost/Ubuntu/home/surya/tiny-tpu/de1_soc_mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'add_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/bias_parent_inst/column_1/add_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v Line: 18
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'add_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/bias_parent_inst/column_2/add_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v Line: 18
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/bias_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'mul_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_parent_inst/leaky_relu_col_1/mul_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v Line: 16
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'mul_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_parent_inst/leaky_relu_col_2/mul_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v Line: 16
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_child.v(16): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'mul_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_derivative_parent_inst/lr_d_col_1/mul_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v Line: 18
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
+# ** Warning: (vsim-2685) [TFMPC] - Too few port connections for 'mul_inst'.  Expected 4, found 3.
+#    Time: 0 ps  Iteration: 0  Instance: /tb_mnist_jtag_classifier/classifier_inst/tpu_inst/vpu_inst/leaky_relu_derivative_parent_inst/lr_d_col_2/mul_inst File: /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v Line: 18
+# ** Warning: (vsim-3722) /home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/rtl/leaky_relu_derivative_child.v(18): [TFMPC] - Missing connection for port 'overflow'.
 # run -all
-# PASS: jtag mmio + classifier predicted expected digit 8 (cycles=304983)
-# End time: 02:22:55 on Mar 16,2026, Elapsed time: 0:00:05
+# PASS: jtag mmio + classifier predicted expected digit 8 (cycles=304983),
+#             total time = 306566
+# End time: 00:56:46 on May 20,2026, Elapsed time: 0:00:07
 # Errors: 0, Warnings: 12
