@@ -28,9 +28,10 @@ delete wave *
 # Note: Adjust the internal path below to match where your Verilog TPU is instantiated inside CFS
 # add wave -hex /neorv32_tb/neorv32_top_inst/neorv32_cfs_inst/YOUR_TPU_INST_NAME/*
 
-add wave /neorv32_tb/neorv32_top/*
+add wave /neorv32_tb/neorv32_top_inst/*
+
 # 4. Run the Simulation
-run 10ms
+run 20ns
 
 # 5. Control Wave Window Zoom 
 # Options: 'wave zoom full' fits everything, or specify a precise time window range
