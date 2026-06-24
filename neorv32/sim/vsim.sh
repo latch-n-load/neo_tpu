@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
+# Color Definitions
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m' # In most terminals, regular brown/yellow shows as orange
+YELLOW='\033[1;33m' # Bold yellow stands out bright
+NC='\033[0m'        # No Color (Resets the terminal back to normal)
 
 set -e
 
-# Jump to the directory where this script lives
+# Setup build directory
 CUR_DIR=$(dirname "$0")
-BUILD_DIR="${CUR_DIR}/build_vsim"
+BUILD_DIR="${CUR_DIR}/vsim_build"
 rm -rf "${BUILD_DIR}"
 
 # Define vsim toolchain executables (assumes they are in your PATH)
@@ -18,21 +24,29 @@ VSIM="${VSIM:-vsim}"
 FILE_LIST="../../rtl/file_list_soc.f"
 
 # 1. Create Build Directory & Library
-mkdir -p ${BUILD_DIR}
-cd ${BUILD_DIR}
-echo "Setting up vsim library..."
+mkdir -p "${BUILD_DIR}"
+cd "${BUILD_DIR}" || exit 1
+
+echo -e "${YELLOW}[INFO] Setting up vsim libraries...${NC}"
 $VLIB neorv32
 $VMAP neorv32 neorv32
 
+$VLIB tiny_tpu_lib
+$VMAP tiny_tpu_lib tiny_tpu_lib
+
 # 2. Compile ALL TPU Verilog Files
-echo "Compiling Verilog TPU files..."
-$VLOG -work neorv32 ../../rtl/tpu_integration/*.v 2>/dev/null || true
+echo -e "${YELLOW}[INFO] Compiling Verilog TPU files...${NC}"
+$VLOG -work tiny_tpu_lib  "../../../tiny-tpu/mnist_demo/rtl/*.v"
+
+echo -e "${YELLOW}[INFO] Compiling NEO-TPU integration modules...${NC}"
+$VLOG -work tiny_tpu_lib "../../rtl/tpu_integration/*.v"
+# $VLOG -work neorv32 ../../rtl/tpu_integration/*.v 2>/dev/null || true
 
 # 3. Parse .f file and Compile VHDL Files in Strict Order
-echo "Parsing $FILE_LIST and compiling VHDL files..."
+echo -e "${YELLOW}[INFO] Parsing $FILE_LIST and compiling NEORV32 VHDL files...${NC}"
 
 if [ ! -f "$FILE_LIST" ]; then
-  echo "ERROR: File list not found at $FILE_LIST"
+  echo "${RED}[ERROR] File list not found at $FILE_LIST${NC}"
   exit 1
 fi
 
@@ -53,29 +67,22 @@ while IFS= read -r line || [ -n "$line" ]; do
   if [ -f "$target_file" ]; then
     $VCOM -work neorv32 -2008 "$target_file"
   else
-    echo "WARNING: File $target_file not found. Skipping."
+    echo "${ORANGE}[WARNING] File $target_file not found. Skipping.${NC}"
   fi
 
 done < "$FILE_LIST"
 
 # 4A. Compile all simulation helper files EXCEPT the main testbench
-echo "Compiling simulation helper files..."
+echo "${YELLOW}[INFO] Compiling simulation helper files...${NC}"
 find ../../sim -type f -name '*.vhd' ! -name 'neorv32_tb.vhd' -exec $VCOM -work neorv32 -2008 {} +
 
 # 4B. Compile the main testbench last
-echo "Compiling main testbench..."
+echo "${YELLOW}[INFO] Compiling main testbench...${NC}"
 $VCOM -work neorv32 -2008 ../../sim/neorv32_tb.vhd
 
 # 5. Prepare and Run Simulation
-if [ -z "$1" ]
-  then
-    VSIM_RUN_ARGS="-do \"run 10ms; quit\""
-  else
-    VSIM_RUN_ARGS=$@
-fi
-
-echo "Vsim simulation run parameters: $VSIM_RUN_ARGS";
-runcmd="$VSIM -c -work neorv32 neorv32_tb $VSIM_RUN_ARGS"
+echo "${YELLOW}[INFO] Vsim simulation run parameters: $VSIM_RUN_ARGS${NC}";
+runcmd="$VSIM -L neorv32 -L tiny_tpu_lib neorv32.neorv32_tb -do vsim_wave.tcl"
 
 if [ -n "$VSIM_NOLOG" ]; then
   eval "$runcmd"
