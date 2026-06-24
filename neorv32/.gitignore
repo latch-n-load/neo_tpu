@@ -43,4 +43,4 @@ riscof_work
 
 # Ale
 /xpacks/
-/sim/build_vsim
+/sim/vsim_build
