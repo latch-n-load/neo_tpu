@@ -31,7 +31,15 @@ delete wave *
 add wave /neorv32_tb/neorv32_top_inst/*
 
 # 4. Run the Simulation
-run 20ns
+# Check if a custom simulation time was passed from the bash shell
+if {[info exists env(SIM_TIME)]} {
+    set run_time $env(SIM_TIME)
+} else {
+    set run_time "1ms" ;
+}
+
+echo "Running simulation for: $run_time"
+run $run_time
 
 # 5. Control Wave Window Zoom 
 # Options: 'wave zoom full' fits everything, or specify a precise time window range

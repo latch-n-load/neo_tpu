@@ -80,6 +80,11 @@ find ../../sim -type f -name '*.vhd' ! -name 'neorv32_tb.vhd' -exec $VCOM -work 
 echo -e "${YELLOW}[INFO] Compiling main testbench...${NC}"
 $VCOM -work neorv32 -2008 ../../sim/neorv32_tb.vhd
 
+# Check user argument
+if [ -n "$1" ]; then
+  export SIM_TIME="$1"
+fi
+
 # 5. Prepare and Run Simulation
 echo -e "${YELLOW}[INFO] Running vsim simulation...${NC}";
 runcmd="$VSIM -t ns -L neorv32 -L tiny_tpu_lib neorv32.neorv32_tb -do ../vsim_wave.tcl"

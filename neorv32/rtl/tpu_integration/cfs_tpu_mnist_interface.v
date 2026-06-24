@@ -4,12 +4,12 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-/* * MODULE: cfs_tpu_interface
+/* * MODULE: cfs_tpu_mnist_interface
  * PURPOSE: Acts as a bridge between the host processor (via CFS-MM bus) and the Tiny-TPU hardware.
  * It provides memory-mapped registers for control (start/clear), status (busy/done), and results (prediction).
  * It also includes a dedicated memory space to buffer the 784-pixel input image.
  */
-module cfs_tpu_interface #(
+module cfs_tpu_mnist_interface #(
     parameter integer PIXELS = 784,                           // Total pixels in a 28x28 MNIST image
     parameter integer PIXEL_ADDR_WIDTH = 10,                  // Bits needed to address 784 pixels (2^10 = 1024)
     parameter [31:0] IMAGE_BASE_ADDR = 32'h00000100           // Base byte address where the image buffer starts
