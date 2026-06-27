@@ -115,7 +115,7 @@ begin
   status_reg(3) <= write_while_busy_reg;
   status_reg(31 downto 4) <= (others => '0');
 
-  -- CFS READONLY registers: 0: Reserved, 1: Status, 2: Result, 3:Version
+  -- CFS READONLY registers: 0: Control (Write Only so Reads 0), 1: Status, 2: Result, 3: Version
   cfs_reg_rd(0) <= (others => '0');
   cfs_reg_rd(1) <= status_reg;
   cfs_reg_rd(2) <= std_logic_vector(resize(unsigned(prediction_reg), 32));
@@ -157,12 +157,14 @@ begin
         prediction_reg <= classifier_prediction_s;
       end if;
 
+      -- Acknowledge bus strobe
       if (bus_req_i.stb = '1') then
         bus_rsp_o.ack <= '1';
 
         -- Read access ----------------------------------------------------------
-        if (bus_req_i.rw = '0') then
-          case std_logic_vector(bus_req_i.addr(15 downto 2)) is
+        if (bus_req_i.rw = '0') then -- rw = 0 for read_en
+          -- Check bus_req_i.addr lower half (excluding 2lsbs) for addressed register
+          case std_logic_vector(bus_req_i.addr(15 downto 2)) is 
             when ctrl_word_addr_c    => bus_rsp_o.data <= cfs_reg_rd(0);
             when status_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(1);
             when result_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(2);
@@ -171,7 +173,7 @@ begin
           end case;
 
         -- Write access ---------------------------------------------------------
-        else
+        else -- rw = 1 for write_en
           if (std_logic_vector(bus_req_i.addr(15 downto 2)) = ctrl_word_addr_c) then
             cfs_reg_wr(0) <= bus_req_i.data;
 
