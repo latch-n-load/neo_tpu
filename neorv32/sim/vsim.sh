@@ -30,16 +30,15 @@ cd "${BUILD_DIR}" || exit 1
 echo -e "${YELLOW}[INFO] Setting up vsim libraries...${NC}"
 $VLIB neorv32
 $VMAP neorv32 neorv32
-
-$VLIB tiny_tpu_lib
-$VMAP tiny_tpu_lib tiny_tpu_lib
+$VLIB tiny_tpu
+$VMAP tiny_tpu tiny_tpu
 
 # 2. Compile ALL TPU Verilog Files
 echo -e "${YELLOW}[INFO] Compiling Verilog TPU files...${NC}"
-$VLOG -work tiny_tpu_lib  "../../../tiny-tpu/mnist_demo/rtl/*.v"
+$VLOG -work tiny_tpu  "../../../tiny-tpu/mnist_demo/rtl/*.v"
 
 echo -e "${YELLOW}[INFO] Compiling NEO-TPU integration modules...${NC}"
-$VLOG -work tiny_tpu_lib "../../rtl/tpu_integration/*.v"
+$VLOG -work tiny_tpu "../../rtl/tpu_integration/*.v"
 # $VLOG -work neorv32 ../../rtl/tpu_integration/*.v 2>/dev/null || true
 
 # 3. Parse .f file and Compile VHDL Files in Strict Order
@@ -87,6 +86,6 @@ fi
 
 # 5. Prepare and Run Simulation
 echo -e "${YELLOW}[INFO] Running vsim simulation...${NC}";
-runcmd="$VSIM -t ns -L neorv32 -L tiny_tpu_lib neorv32.neorv32_tb -do ../vsim_wave.tcl"
+runcmd="$VSIM -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
 
 eval "$runcmd" 2>&1 | tee vsim.log

@@ -3,38 +3,41 @@
 `timescale 1ns/1ps
 `default_nettype none
 
-module cfs_tpu_mnist_wrapper;
-    localparam integer PIXELS = 784;
-    localparam integer PIXEL_ADDR_WIDTH = 10;
-    localparam integer CLOCK_HZ = 50000000;
-    localparam integer MAX_WAIT_CYCLES = 2000000;
-    localparam [31:0] IMAGE_BASE = 32'h00000100;
-    localparam W1_INIT_FILE = "../../../data/model/reference/w1_tiled_q8_8.memh";
-    localparam B1_INIT_FILE = "../../../data/model/reference/b1_q8_8.memh";
-    localparam W2_INIT_FILE = "../../../data/model/reference/w2_tiled_q8_8.memh";
-    localparam B2_INIT_FILE = "../../../data/model/reference/b2_q8_8.memh";
+module cfs_tpu_mnist_wrap #(
+    parameter integer PIXELS = 784;
+    parameter integer PIXEL_ADDR_WIDTH = 10;
+    parameter integer CLOCK_HZ = 50000000;
+    parameter integer MAX_WAIT_CYCLES = 2000000;
+    parameter [31:0] IMAGE_BASE = 32'h00000100;
+    parameter W1_INIT_FILE = "../../../data/model/reference/w1_tiled_q8_8.memh";
+    parameter B1_INIT_FILE = "../../../data/model/reference/b1_q8_8.memh";
+    parameter W2_INIT_FILE = "../../../data/model/reference/w2_tiled_q8_8.memh";
+    parameter B2_INIT_FILE = "../../../data/model/reference/b2_q8_8.memh";
+) ( 
+    input wire clk,
+    input wire rst,
+    input wire [31:0] cfs_addr_i;
 
-    reg clk;
-    reg rst;
-    reg [31:0] cfs_addr_i;
-    reg avs_read;
-    reg avs_write;
-    reg [31:0] avs_writedata;
-    reg [3:0] avs_byteenable;
-    wire [31:0] avs_readdata;
-    wire avs_readdatavalid;
-    wire avs_waitrequest;
+);
+    
+    reg cfs_read_en_i;
+    reg cfs_write_en_i;
+    reg [31:0] cfs_write_data_i;
+    reg [3:0] cfs_byte_en_i;
+    wire [31:0] cfs_read_data_o;
+    wire cfs_read_data_valid_o;
+    wire cfs_wait_req_o;
 
-    wire classifier_busy;
-    wire classifier_done;
-    wire [3:0] classifier_prediction;
-    wire [PIXEL_ADDR_WIDTH - 1:0] pixel_addr;
-    wire [15:0] pixel_data;
-    wire start_pulse;
-    wire frame_loaded;
-    wire done_sticky;
-    wire write_while_busy;
-    wire [3:0] prediction_latched;
+    wire tpu_busy;
+    wire tpu_done;
+    wire [3:0] tpu_prediction;
+    wire [PIXEL_ADDR_WIDTH - 1:0] tpu_pixel_addr;
+    wire [15:0] tpu_pixel_data;
+    wire tpu_start;
+    wire tpu_frame_ldd;
+    wire tpu_done;
+    wire tpu_write_while_busy;
+    wire [3:0] tpu_prediction;
 
     reg [7:0] sample_bytes [0:(PIXELS / 8) - 1];
     integer pixel_index;
@@ -54,23 +57,23 @@ module cfs_tpu_mnist_wrapper;
         .clk(clk),
         .rst(rst),
         .cfs_addr_i(cfs_addr_i),
-        .avs_read(avs_read),
-        .avs_write(avs_write),
-        .avs_writedata(avs_writedata),
-        .avs_byteenable(avs_byteenable),
-        .avs_readdata(avs_readdata),
-        .avs_readdatavalid(avs_readdatavalid),
-        .avs_waitrequest(avs_waitrequest),
-        .busy_in(classifier_busy),
-        .done_in(classifier_done),
-        .prediction_in(classifier_prediction),
-        .pixel_addr_in(pixel_addr),
-        .pixel_data_out(pixel_data),
-        .start_pulse_out(start_pulse),
-        .frame_loaded_out(frame_loaded),
-        .done_sticky_out(done_sticky),
-        .write_while_busy_out(write_while_busy),
-        .prediction_latched_out(prediction_latched)
+        .cfs_read_en_i(cfs_read_en_i),
+        .cfs_write_en_i(cfs_write_en_i),
+        .cfs_write_data_i(cfs_write_data_i),
+        .cfs_byte_en_i(cfs_byte_en_i),
+        .cfs_read_data_o(cfs_read_data_o),
+        .cfs_read_data_valid_o(cfs_read_data_valid_o),
+        .cfs_wait_req_o(cfs_wait_req_o),
+        .tpu_busy_i(tpu_busy),
+        .tpu_done_i(tpu_done),
+        .tpu_prediction_i(tpu_prediction),
+        .tpu_pixel_addr_i(tpu_pixel_addr),
+        .tpu_pixel_data_o(tpu_pixel_data),
+        .tpu_start_o(tpu_start),
+        .tpu_frame_ldd_o(tpu_frame_ldd),
+        .tpu_done_o(tpu_done),
+        .tpu_write_while_busy_o(tpu_write_while_busy),
+        .cfs_prediction_o(tpu_prediction)
     );
 
     mnist_classifier_core #(
@@ -90,12 +93,12 @@ module cfs_tpu_mnist_wrapper;
     ) classifier_inst (
         .clk(clk),
         .rst(rst),
-        .start(start_pulse),
-        .pixel_data_in(pixel_data),
-        .pixel_addr_out(pixel_addr),
-        .busy(classifier_busy),
-        .done(classifier_done),
-        .prediction_out(classifier_prediction)
+        .start(tpu_start),
+        .pixel_data_in(tpu_pixel_data),
+        .pixel_addr_out(tpu_pixel_addr),
+        .busy(tpu_busy),
+        .done(tpu_done),
+        .prediction_out(tpu_prediction)
     );
 
     initial begin
@@ -109,14 +112,14 @@ module cfs_tpu_mnist_wrapper;
         begin
             @(posedge clk);
             cfs_addr_i <= addr;
-            avs_writedata <= value;
-            avs_byteenable <= 4'h1;
-            avs_write <= 1'b1;
-            avs_read <= 1'b0;
+            cfs_write_data_i <= value;
+            cfs_byte_en_i <= 4'h1;
+            cfs_write_en_i <= 1'b1;
+            cfs_read_en_i <= 1'b0;
             @(posedge clk);
-            avs_write <= 1'b0;
+            cfs_write_en_i <= 1'b0;
             cfs_addr_i <= 32'h0;
-            avs_writedata <= 32'h0;
+            cfs_write_data_i <= 32'h0;
         end
     endtask
 
@@ -126,23 +129,23 @@ module cfs_tpu_mnist_wrapper;
         begin
             @(posedge clk);
             cfs_addr_i <= addr;
-            avs_read <= 1'b1;
-            avs_write <= 1'b0;
+            cfs_read_en_i <= 1'b1;
+            cfs_write_en_i <= 1'b0;
             @(posedge clk);
-            avs_read <= 1'b0;
+            cfs_read_en_i <= 1'b0;
             cfs_addr_i <= 32'h0;
-            wait (avs_readdatavalid);
-            value = avs_readdata;
+            wait (cfs_read_data_valid_o);
+            value = cfs_read_data_o;
         end
     endtask
 
     initial begin
         rst = 1'b1;
         cfs_addr_i = 32'h0;
-        avs_read = 1'b0;
-        avs_write = 1'b0;
-        avs_writedata = 32'h0;
-        avs_byteenable = 4'h1;
+        cfs_read_en_i = 1'b0;
+        cfs_write_en_i = 1'b0;
+        cfs_write_data_i = 32'h0;
+        cfs_byte_en_i = 4'h1;
         expected_label = 4'd0;
         expected_label_int = 0;
 
@@ -171,8 +174,8 @@ module cfs_tpu_mnist_wrapper;
             );
         end
 
-        if (!frame_loaded) begin
-            $display("FAIL: frame_loaded should be high after image writes");
+        if (!tpu_frame_ldd) begin
+            $display("FAIL: tpu_frame_ldd should be high after image writes");
             $finish(1);
         end
 
@@ -183,13 +186,13 @@ module cfs_tpu_mnist_wrapper;
             while (wait_cycles < MAX_WAIT_CYCLES) begin
                 @(posedge clk);
                 wait_cycles = wait_cycles + 1;
-                if (classifier_done) begin
+                if (tpu_done) begin
                     disable wait_for_done;
                 end
             end
         end
 
-        if (!classifier_done) begin
+        if (!tpu_done) begin
             $display(
                 "FAIL: timed out waiting for done after %0d cycles (state=%0d layer=%0d chunk=%0d)",
                 wait_cycles,
@@ -207,17 +210,17 @@ module cfs_tpu_mnist_wrapper;
             $display("FAIL: done bit not set in status register: %h", status_value);
             $finish(1);
         end
-        if (write_while_busy) begin
-            $display("FAIL: write_while_busy should remain low in nominal flow");
+        if (tpu_write_while_busy) begin
+            $display("FAIL: tpu_write_while_busy should remain low in nominal flow");
             $finish(1);
         end
-        if ((result_value[3:0] != expected_label) || (prediction_latched != expected_label)) begin
+        if ((result_value[3:0] != expected_label) || (tpu_prediction != expected_label)) begin
             $display(
                 "FAIL: prediction mismatch expected=%0d result_reg=%0d latched=%0d classifier=%0d",
                 expected_label,
                 result_value[3:0],
-                prediction_latched,
-                classifier_prediction
+                tpu_prediction,
+                tpu_prediction
             );
             $finish(1);
         end
