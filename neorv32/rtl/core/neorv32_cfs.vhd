@@ -47,7 +47,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   constant result_word_addr_c   : std_logic_vector(13 downto 0) := "00000000000010";
   constant version_word_addr_c  : std_logic_vector(13 downto 0) := "00000000000011";
   constant image_base_word_addr_c : natural := PIXEL_BASE_ADDR_REG / 4;
-  constant image_word_count_c     : natural := (PIXELS + 31) / 32;
+  constant image_word_count_c     : natural := (PIXELS + 31) / 32; -- Since 784 % 32 != 0, ceil to nearest word integer
   constant image_last_word_addr_c : natural := image_base_word_addr_c + image_word_count_c - 1;
   constant version_value_c        : std_logic_vector(31 downto 0) := x"4D4E4953";
   constant q8_8_one_c             : std_logic_vector(15 downto 0) := x"0100";
@@ -60,7 +60,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
 
   -- Image storage and loading state --------------------------------------------
   signal frame_bits      : std_logic_vector(PIXELS-1 downto 0);
-  signal frame_valid     : std_logic_vector(PIXELS-1 downto 0);
+  signal frame_valid     : std_logic_vector(PIXELS-1 downto 0); -- Indicates which pixels in frame_bits are valid (like a cache)
   signal pixel_load_count : natural range 0 to PIXELS;
   signal frame_loaded_reg : std_logic;
   signal write_while_busy_reg : std_logic;
@@ -106,7 +106,7 @@ begin
 
   -- CFS IOs ---------------------------------------------------------------------
   cfs_out_o <= (others => '0');
-  irq_o     <= '0';
+  irq_o     <= '0'; -- TODO: Implement interrupt when classifier done or error
 
   -- Read-only register values --------------------------------------------------
   status_reg(0) <= classifier_busy_s;
@@ -121,11 +121,6 @@ begin
   cfs_reg_rd(2) <= std_logic_vector(resize(unsigned(prediction_reg), 32));
   cfs_reg_rd(3) <= version_value_c;
 
-  -- Pixel data formatting ------------------------------------------------------
-  -- The classifier expects Q8.8 values. A binary '1' pixel is mapped to 0x0100,
-  -- while '0' is mapped to 0x0000, matching the TPU bridge behavior.
-  pixel_data_s <= q8_8_one_c when (pixel_addr_int < PIXELS and frame_bits(pixel_addr_int) = '1') else q8_8_zero_c;
-
   -- Bus interface --------------------------------------------------------------
   bus_access: process(rstn_i, clk_i)
     variable addr_word_v : natural;
@@ -137,7 +132,7 @@ begin
       cfs_reg_wr <= (others => (others => '0'));
       bus_rsp_o  <= rsp_terminate_c;
       frame_bits <= (others => '0');
-      frame_valid <= (others => '0');
+      frame_valid <= (others => '0'); -- Intialize pixel frame as invalid (like cache)
       pixel_load_count <= 0;
       frame_loaded_reg <= '0';
       write_while_busy_reg <= '0';
@@ -174,6 +169,7 @@ begin
 
         -- Write access ---------------------------------------------------------
         else -- rw = 1 for write_en
+          -- If control_reg is accessed
           if (std_logic_vector(bus_req_i.addr(15 downto 2)) = ctrl_word_addr_c) then
             cfs_reg_wr(0) <= bus_req_i.data;
 
@@ -204,40 +200,50 @@ begin
               write_while_busy_reg <= '0';
             end if;
 
+          -- Test: Allows writing to status, result and version
           elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = status_word_addr_c) then
             cfs_reg_wr(1) <= bus_req_i.data;
           elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = result_word_addr_c) then
             cfs_reg_wr(2) <= bus_req_i.data;
           elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = version_word_addr_c) then
             cfs_reg_wr(3) <= bus_req_i.data;
+
+          -- If bus_req_i.addr is NOT ctrl, status, result or version -> Write to image frame
           else
+            -- Get word address and check if it is within the image frame range
             addr_word_v := to_integer(unsigned(std_logic_vector(bus_req_i.addr(15 downto 2))));
             if (addr_word_v >= image_base_word_addr_c and addr_word_v <= image_last_word_addr_c) then
+              -- Prevent writing to image frame when classifier busy
               if (classifier_busy_s = '1') then
                 write_while_busy_reg <= '1';
               else
-                pixel_base_v := (addr_word_v - image_base_word_addr_c) * 32;
-                pixels_this_word_v := 32;
+                -- If classifier idle, get pixel id (not address) being written
+                pixel_base_v := (addr_word_v - image_base_word_addr_c) * 32; -- Each successive access jumps by 32 because
+                pixels_this_word_v := 32; -- Each word has 32 1b pixels
+                -- When writing last pixels, check if written word exceeds total PIXELS
                 if (pixel_base_v + pixels_this_word_v > PIXELS) then
-                  pixels_this_word_v := PIXELS - pixel_base_v;
+                  pixels_this_word_v := PIXELS - pixel_base_v; -- So pixels_this_word_v < 32
                 end if;
 
+                -- Loop to extract 1b pixel from 32b pixels_this_word
                 for bit_idx_v in 0 to 31 loop
-                  if (bit_idx_v < pixels_this_word_v) then
-                    if (frame_valid(pixel_base_v + bit_idx_v) = '0') then
-                      frame_bits(pixel_base_v + bit_idx_v) <= bus_req_i.data(bit_idx_v);
-                      frame_valid(pixel_base_v + bit_idx_v) <= '1';
+                  if (bit_idx_v < pixels_this_word_v) then -- Check if pixel_this_word < 32
+                    if (frame_valid(pixel_base_v + bit_idx_v) = '0') then -- Check if current pixel is invalid
+                      frame_bits(pixel_base_v + bit_idx_v) <= bus_req_i.data(bit_idx_v); -- Write pixel bit from bus to frame
+                      frame_valid(pixel_base_v + bit_idx_v) <= '1'; -- Set valid bit 
                     end if;
                   end if;
                 end loop;
-
+                
+                -- Check if all pixels loaded
                 if (pixel_load_count + pixels_this_word_v >= PIXELS) then
                   pixel_load_count <= PIXELS;
                   frame_loaded_reg <= '1';
                 else
                   pixel_load_count <= pixel_load_count + pixels_this_word_v;
                 end if;
-
+                
+                -- Set frame_loaded_reg 
                 if (pixel_load_count + pixels_this_word_v >= PIXELS) then
                   frame_loaded_reg <= '1';
                 end if;
@@ -260,6 +266,11 @@ begin
       pixel_addr_int <= 0;
     end if;
   end process pixel_addr_decode;
+
+  -- Pixel data formatting ------------------------------------------------------
+  -- The classifier expects Q8.8 values. A binary '1' pixel is mapped to 0x0100,
+  -- while '0' is mapped to 0x0000
+  pixel_data_s <= q8_8_one_c when (pixel_addr_int < PIXELS and frame_bits(pixel_addr_int) = '1') else q8_8_zero_c;
 
   -- Instantiate MNIST classifier core ------------------------------------------
   classifier_inst : mnist_classifier_core
