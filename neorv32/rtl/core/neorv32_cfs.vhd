@@ -19,7 +19,11 @@ entity neorv32_cfs is
   generic ( 
     PIXELS : integer := 784;
     PIXEL_ADDR_WIDTH : integer := index_size_f(784); -- TODO tried auto-calc -> Check
-    PIXEL_BASE_ADDR_REG : integer := 16#100# -- Pixel base register at 0x100
+    PIXEL_BASE_ADDR_REG : integer := 16#100#; -- Pixel base register at 0x100
+    W1_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
+    B1_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
+    W2_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
+    B2_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
   );
   port (
     -- global control --
@@ -71,8 +75,8 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   signal classifier_done_s  : std_logic;
   signal classifier_prediction_s : std_logic_vector(3 downto 0);
   signal pixel_data_s       : std_logic_vector(15 downto 0);
-  signal pixel_addr_s       : std_logic_vector(PIXEL_ADDR_WIDTH-1 downto 0);
-  signal pixel_addr_int     : integer range 0 to PIXELS-1;
+  signal pixel_addr_s       : std_logic_vector(PIXEL_ADDR_WIDTH-1 downto 0) := (others => '0');
+  signal pixel_addr_int     : integer range 0 to PIXELS;
   signal done_reg           : std_logic;
   signal prediction_reg     : std_logic_vector(3 downto 0);
   signal status_reg         : std_logic_vector(31 downto 0);
@@ -88,7 +92,11 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
       OUTPUT_ADDR_WIDTH    : integer;
       TILE_WIDTH           : integer;
       UNIFIED_BUFFER_WIDTH : integer;
-      PRELOAD_MODEL        : integer
+      PRELOAD_MODEL        : integer;
+      W1_INIT_FILE         : string;
+      B1_INIT_FILE         : string;
+      W2_INIT_FILE         : string;
+      B2_INIT_FILE         : string      
     );
     port (
       clk            : in  std_logic;
@@ -283,7 +291,11 @@ begin
       OUTPUT_ADDR_WIDTH    => 4,
       TILE_WIDTH           => 2,
       UNIFIED_BUFFER_WIDTH => 128,
-      PRELOAD_MODEL        => 1
+      PRELOAD_MODEL        => 1,
+      W1_INIT_FILE         => W1_INIT_FILE,
+      B1_INIT_FILE         => B1_INIT_FILE,
+      W2_INIT_FILE         => W2_INIT_FILE,
+      B2_INIT_FILE         => B2_INIT_FILE
     )
     port map (
       clk            => clk_i,
