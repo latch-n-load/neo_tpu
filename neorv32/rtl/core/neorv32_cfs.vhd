@@ -80,6 +80,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   signal done_reg           : std_logic;
   signal prediction_reg     : std_logic_vector(3 downto 0);
   signal status_reg         : std_logic_vector(31 downto 0);
+  signal irq_pending_reg    : std_logic;
 
   -- mnist_classifier_core component declaration --------------------------------
   component mnist_classifier_core is
@@ -112,16 +113,17 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
 
 begin
 
-  -- CFS IOs ---------------------------------------------------------------------
+  -- CFS IOs 
   cfs_out_o <= (others => '0');
-  irq_o     <= '0'; -- TODO: Implement interrupt when classifier done or error
+  irq_o <= irq_pending_reg;
 
-  -- Read-only register values --------------------------------------------------
+  -- Status register bit assignments
   status_reg(0) <= classifier_busy_s;
   status_reg(1) <= done_reg;
   status_reg(2) <= frame_loaded_reg;
   status_reg(3) <= write_while_busy_reg;
-  status_reg(31 downto 4) <= (others => '0');
+  status_reg(4) <= irq_pending_reg;
+  status_reg(31 downto 5) <= (others => '0');
 
   -- CFS READONLY registers: 0: Control (Write Only so Reads 0), 1: Status, 2: Result, 3: Version
   cfs_reg_rd(0) <= (others => '0');
@@ -146,6 +148,7 @@ begin
       write_while_busy_reg <= '0';
       done_reg <= '0';
       prediction_reg <= (others => '0');
+      irq_pending_reg <= '0';
       classifier_start_s <= '0';
     elsif rising_edge(clk_i) then
       -- Default values for one-cycle responses.
@@ -158,6 +161,7 @@ begin
       if (classifier_done_s = '1') then
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
+        irq_pending_reg <= '1';
       end if;
 
       -- Acknowledge bus strobe
@@ -196,7 +200,7 @@ begin
               pixel_load_count <= 0;
               frame_loaded_reg <= '0';
               write_while_busy_reg <= '0';
-              done_reg <= '0';
+              done_reg <= '0'; -- Clear done, clear irq_o
               prediction_reg <= (others => '0');
             end if;
 
@@ -206,6 +210,10 @@ begin
 
             if (bus_req_i.data(3) = '1') then
               write_while_busy_reg <= '0';
+            end if;
+
+            if (bus_req_i.data(4) = '1') then
+              irq_pending_reg <= '0';
             end if;
 
           -- Test: Allows writing to status, result and version
@@ -224,6 +232,7 @@ begin
               -- Prevent writing to image frame when classifier busy
               if (classifier_busy_s = '1') then
                 write_while_busy_reg <= '1';
+                irq_pending_reg <= '1';
               else
                 -- If classifier idle, get pixel id (not address) being written
                 pixel_base_v := (addr_word_v - image_base_word_addr_c) * 32; -- Each successive access jumps by 32 because
@@ -263,21 +272,10 @@ begin
     end if;
   end process bus_access;
 
-  -- Pixel address decoding -----------------------------------------------------
-  -- The classifier requests one pixel at a time through pixel_addr_out. We simply
-  -- translate that address to the corresponding stored bit and forward it as Q8.8.
-  pixel_addr_decode: process(all)
-  begin
-    if (PIXELS > 0) then
-      pixel_addr_int <= to_integer(unsigned(pixel_addr_s));
-    else
-      pixel_addr_int <= 0;
-    end if;
-  end process pixel_addr_decode;
-
   -- Pixel data formatting ------------------------------------------------------
   -- The classifier expects Q8.8 values. A binary '1' pixel is mapped to 0x0100,
   -- while '0' is mapped to 0x0000
+  pixel_addr_int <= to_integer(unsigned(pixel_addr_s)); --Convert to int for lookup
   pixel_data_s <= q8_8_one_c when (pixel_addr_int < PIXELS and frame_bits(pixel_addr_int) = '1') else q8_8_zero_c;
 
   -- Instantiate MNIST classifier core ------------------------------------------
