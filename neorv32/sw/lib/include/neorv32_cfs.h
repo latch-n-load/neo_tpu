@@ -9,9 +9,6 @@
 /**
  * @file neorv32_cfs.h
  * @brief Custom Functions Subsystem (CFS) HW driver header file.
- *
- * @warning There are no "real" CFS driver functions available here, because these functions are defined by the actual hardware.
- * @warning The CFS designer has to provide the actual driver functions.
  */
 
 #ifndef NEORV32_CFS_H
@@ -25,21 +22,58 @@
  **************************************************************************/
 /**@{*/
 /** CFS module prototype */
-typedef volatile struct __attribute__((packed,aligned(4))) {
-  uint32_t REG[(64*1024)/4]; /**< CFS registers, user-defined */
+typedef volatile struct __attribute__((packed, aligned(4))) {
+  uint32_t CONTROL;        /**< Offset 0x00: Control register */
+  uint32_t STATUS;         /**< Offset 0x04: Status register */
+  uint32_t RESULT;         /**< Offset 0x08: Result register */
+  uint32_t VERSION_VALUE;  /**< Offset 0x0C: Version register */
+  uint32_t RESERVED[((64u * 1024u) / 4u) - 4u];
 } neorv32_cfs_t;
 
-/** CFS module hardware handle (#neorv32_cfs_t) */
-#define NEORV32_CFS ((neorv32_cfs_t*) (NEORV32_CFS_BASE))
-/**@}*/
+/** CFS module hardware handle */
+#define NEORV32_CFS ((neorv32_cfs_t *)(uintptr_t)NEORV32_CFS_BASE)
 
+/* Register indices (word based, matching the HDL register map) */
+enum {
+  CFS_REG_CONTROL = 0u,
+  CFS_REG_STATUS = 1u,
+  CFS_REG_RESULT = 2u,
+  CFS_REG_VERSION = 3u
+};
+
+/* Control register bits */
+#define CFS_CTRL_START_BIT         (1u << 0)
+#define CFS_CTRL_CLEAR_FRAME_BIT   (1u << 1)
+#define CFS_CTRL_CLEAR_DONE_BIT    (1u << 2)
+#define CFS_CTRL_CLEAR_ERR_BIT     (1u << 3)
+#define CFS_CTRL_CLEAR_IRQ_BIT     (1u << 4)
+
+/* Status register bits */
+#define CFS_STATUS_BUSY_BIT        (1u << 0)
+#define CFS_STATUS_DONE_BIT        (1u << 1)
+#define CFS_STATUS_FRAME_LOADED_BIT (1u << 2)
+#define CFS_STATUS_WRITE_BUSY_BIT  (1u << 3)
+#define CFS_STATUS_IRQ_PENDING_BIT (1u << 4)
+
+#define CFS_VERSION_VALUE          0x4D4E4953u
+#define CFS_IMAGE_WORD_BASE        0x40u
+#define CFS_IMAGE_WORD_COUNT       ((784u + 31u) / 32u)
+/**@}*/
 
 /**********************************************************************//**
  * @name Prototypes
  **************************************************************************/
 /**@{*/
 int neorv32_cfs_available(void);
+void neorv32_cfs_write_reg(uint32_t reg, uint32_t value);
+uint32_t neorv32_cfs_read_reg(uint32_t reg);
+void neorv32_cfs_clear_frame(void);
+void neorv32_cfs_clear_done(void);
+void neorv32_cfs_clear_error(void);
+void neorv32_cfs_clear_irq(void);
+void neorv32_cfs_start_inference(void);
+void neorv32_cfs_load_image(const uint8_t *pixel_array, uint32_t pixel_count);
+uint32_t neorv32_cfs_wait_for_result(uint32_t *prediction);
 /**@}*/
 
-
-#endif // NEORV32_CFS_H
+#endif

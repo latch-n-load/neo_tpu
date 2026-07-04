@@ -2,7 +2,6 @@
 # Color Definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-ORANGE='\033[0;33m' # In most terminals, regular brown/yellow shows as orange
 YELLOW='\033[1;33m' # Bold yellow stands out bright
 NC='\033[0m'        # No Color (Resets the terminal back to normal)
 
@@ -26,6 +25,7 @@ FILE_LIST="../../rtl/file_list_soc.f"
 # 1. Create Build Directory & Library
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}" || exit 1
+echo -e "${YELLOW}Working directory: $(pwd)${NC}"
 
 echo -e "${YELLOW}[INFO] Setting up vsim libraries...${NC}"
 $VLIB neorv32
@@ -37,9 +37,9 @@ $VMAP tiny_tpu tiny_tpu
 echo -e "${YELLOW}[INFO] Compiling Verilog TPU files...${NC}"
 $VLOG -work tiny_tpu  "../../../tiny-tpu/mnist_demo/rtl/*.v"
 
-echo -e "${YELLOW}[INFO] Compiling NEO-TPU integration modules...${NC}"
-$VLOG -work tiny_tpu "../../rtl/tpu_integration/*.v"
-# $VLOG -work neorv32 ../../rtl/tpu_integration/*.v 2>/dev/null || true
+# Currently Unused: In case some glue logic is needed
+# echo -e "${YELLOW}[INFO] Compiling NEO-TPU integration modules...${NC}"
+# $VLOG -work tiny_tpu "../../../rtl/tpu_integration/*.v"
 
 # 3. Parse .f file and Compile VHDL Files in Strict Order
 echo -e "${YELLOW}[INFO] Parsing $FILE_LIST and compiling NEORV32 VHDL files...${NC}"
@@ -82,10 +82,17 @@ $VCOM -work neorv32 -2008 ../../sim/neorv32_tb.vhd
 # Check user argument
 if [ -n "$1" ]; then
   export SIM_TIME="$1"
+else 
+  export SIM_TIME="all"
 fi
 
-# 5. Prepare and Run Simulation
-echo -e "${YELLOW}[INFO] Running vsim simulation...${NC}";
-runcmd="$VSIM -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
+# Check for Waveforms (Argument 2)
+if [ "$2" == "wave" ]; then
+  echo -e "${YELLOW}[INFO] Running vsim simulation in GUI Mode...${NC}";
+  runcmd="$VSIM -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
+else
+  echo -e "${YELLOW}[INFO] Running vsim simulation in Console Mode...${NC}";
+  runcmd="$VSIM -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do \"run -\$SIM_TIME; quit -f\""
+fi
 
 eval "$runcmd" 2>&1 | tee vsim.log

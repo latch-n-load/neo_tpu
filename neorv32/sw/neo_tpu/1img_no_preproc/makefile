@@ -29,8 +29,8 @@ USER_FLAGS += -Wl,--defsym,__neorv32_ram_size=8k
 # Ale
 USER_FLAGS += -DUART0_SIM_MODE
 
-GHDL_RUN_FLAGS += --wave=1img_nopreproc.ghw
-GHDL_RUN_FLAGS += --stop-time=1ms 
+# GHDL_RUN_FLAGS += --wave=1img_nopreproc.ghw
+GHDL_RUN_FLAGS += --stop-time=10ms 
 
 # Set path to NEORV32 root directory
 NEORV32_HOME ?= ../../..

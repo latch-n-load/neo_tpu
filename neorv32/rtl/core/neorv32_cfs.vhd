@@ -1,12 +1,6 @@
 -- ================================================================================ --
 -- NEORV32 SoC - Custom Functions Subsystem (CFS)                                   --
 -- -------------------------------------------------------------------------------- --
--- The NEORV32 RISC-V Processor - https://github.com/stnolting/neorv32              --
--- Copyright (c) NEORV32 contributors.                                              --
--- Copyright (c) 2020 - 2025 Stephan Nolting. All rights reserved.                  --
--- Licensed under the BSD-3-Clause license, see LICENSE for details.                --
--- SPDX-License-Identifier: BSD-3-Clause                                            --
--- ================================================================================ --
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -161,6 +155,8 @@ begin
       if (classifier_done_s = '1') then
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
+        report "DEBUG HW: @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
+                & " | prediction_reg:" & to_string(prediction_reg);
         irq_pending_reg <= '1';
       end if;
 
@@ -171,10 +167,21 @@ begin
         -- Read access ----------------------------------------------------------
         if (bus_req_i.rw = '0') then -- rw = 0 for read_en
           -- Check bus_req_i.addr lower half (excluding 2lsbs) for addressed register
+          -- report "Time: " & to_string(now) & " | bus_req.addr: 0x" & to_hstring(bus_req_i.addr) 
+          -- & " | Data: 0x" & to_hstring(bus_req_i.data) & " | RW: " & to_string(bus_req_i.rw) 
+          -- & " | BEN: " & to_string(bus_req_i.ben) & " | STB: " & to_string(bus_req_i.stb);
           case std_logic_vector(bus_req_i.addr(15 downto 2)) is 
             when ctrl_word_addr_c    => bus_rsp_o.data <= cfs_reg_rd(0);
             when status_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(1);
-            when result_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(2);
+            when result_word_addr_c  => 
+              bus_rsp_o.data <= cfs_reg_rd(2);
+              
+              -- report "DEBUG HW: @" & to_string(now) & " Received Addr: " & 
+              -- integer'image (to_integer(unsigned(bus_req_i.addr(15 downto 2)))) & " | Data: "
+              -- & integer'image(to_integer(unsigned(cfs_reg_rd(2))));
+              report "DEBUG HW: @" & to_string(now) & " Received Addr: " & 
+              to_hstring(bus_req_i.addr(15 downto 2)) & " | Data: " & to_hstring(cfs_reg_rd(2));
+
             when version_word_addr_c => bus_rsp_o.data <= cfs_reg_rd(3);
             when others              => bus_rsp_o.data <= (others => '0');
           end case;
@@ -217,12 +224,12 @@ begin
             end if;
 
           -- Test: Allows writing to status, result and version
-          elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = status_word_addr_c) then
-            cfs_reg_wr(1) <= bus_req_i.data;
-          elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = result_word_addr_c) then
-            cfs_reg_wr(2) <= bus_req_i.data;
-          elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = version_word_addr_c) then
-            cfs_reg_wr(3) <= bus_req_i.data;
+          -- elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = status_word_addr_c) then
+          --   cfs_reg_wr(1) <= bus_req_i.data;
+          -- elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = result_word_addr_c) then
+          --   cfs_reg_wr(2) <= bus_req_i.data;
+          -- elsif (std_logic_vector(bus_req_i.addr(15 downto 2)) = version_word_addr_c) then
+          --   cfs_reg_wr(3) <= bus_req_i.data;
 
           -- If bus_req_i.addr is NOT ctrl, status, result or version -> Write to image frame
           else
@@ -234,7 +241,7 @@ begin
                 write_while_busy_reg <= '1';
                 irq_pending_reg <= '1';
               else
-                -- If classifier idle, get pixel id (not address) being written
+                -- If classifier idle, get pixel id (not absolute address) being written
                 pixel_base_v := (addr_word_v - image_base_word_addr_c) * 32; -- Each successive access jumps by 32 because
                 pixels_this_word_v := 32; -- Each word has 32 1b pixels
                 -- When writing last pixels, check if written word exceeds total PIXELS
@@ -243,10 +250,16 @@ begin
                 end if;
 
                 -- Loop to extract 1b pixel from 32b pixels_this_word
+                report "DEBUG HW: @" & to_string(now) & " | Received Addr:" & integer'image(addr_word_v) 
+                & " | Data:" & to_hstring(bus_req_i.data) & " | Pixel Base:" & to_string(pixel_base_v);
                 for bit_idx_v in 0 to 31 loop
                   if (bit_idx_v < pixels_this_word_v) then -- Check if pixel_this_word < 32
                     if (frame_valid(pixel_base_v + bit_idx_v) = '0') then -- Check if current pixel is invalid
                       frame_bits(pixel_base_v + bit_idx_v) <= bus_req_i.data(bit_idx_v); -- Write pixel bit from bus to frame
+
+                      -- report "DEBUG HW: @" & to_string(now) & " | frame_bits (" & to_string(pixel_base_v + bit_idx_v) 
+                      -- & ") = " & to_string(bus_req_i.data(bit_idx_v));
+                      
                       frame_valid(pixel_base_v + bit_idx_v) <= '1'; -- Set valid bit 
                     end if;
                   end if;
