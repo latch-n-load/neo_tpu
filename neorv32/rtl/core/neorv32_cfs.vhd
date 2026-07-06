@@ -12,12 +12,12 @@ use neorv32.neorv32_package.all;
 entity neorv32_cfs is
   generic ( 
     PIXELS : integer := 784;
-    PIXEL_ADDR_WIDTH : integer := index_size_f(784); -- TODO tried auto-calc -> Check
+    PIXEL_ADDR_WIDTH : integer := index_size_f(784);
     PIXEL_BASE_ADDR_REG : integer := 16#100#; -- Pixel base register at 0x100
-    W1_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
-    B1_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
-    W2_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
-    B2_INIT_FILE : string := "../../tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
+    W1_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
+    B1_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
+    W2_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
+    B2_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
   );
   port (
     -- global control --
@@ -156,7 +156,7 @@ begin
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
         report "DEBUG HW: @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
-                & " | prediction_reg:" & to_string(prediction_reg);
+                & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
         irq_pending_reg <= '1';
       end if;
 
@@ -199,6 +199,7 @@ begin
             -- bit3 : clear write-while-busy flag
             if (bus_req_i.data(0) = '1' and frame_loaded_reg = '1' and classifier_busy_s = '0') then
               classifier_start_s <= '1';
+              report "DEBUG HW: @" & to_string(now) & " Sending start = " & std_logic'image(bus_req_i.data(0));
             end if;
 
             if (bus_req_i.data(1) = '1') then

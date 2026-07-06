@@ -2,14 +2,6 @@
 # ModelSim / Questa Interactive Simulation Tcl Script
 # ==============================================================================
 
-# 1. Open the necessary GUI windows
-view structure
-view signals
-view wave
-
-# 2. Clear any existing signals from the wave window
-delete wave *
-
 # 3. Add Waveforms to the Window
 # Customize these paths to match your exact testbench structure
 # add wave -divider "System Clock & Reset"
@@ -28,23 +20,43 @@ delete wave *
 # Note: Adjust the internal path below to match where your Verilog TPU is instantiated inside CFS
 # add wave -hex /neorv32_tb/neorv32_top_inst/neorv32_cfs_inst/YOUR_TPU_INST_NAME/*
 
-add wave /neorv32_tb/neorv32_top_inst/*
+# 1. Log data to memory WITHOUT adding it to the visual wave window
+# -r enables recursion.
+log -r -depth 2 /neorv32_tb/neorv32_top_inst/io_system/neorv32_cfs_enabled/neorv32_cfs_inst/*
 
-# 4. Run the Simulation
+# Hide Numeric_std warnings
+set NumericStdNoWarnings 1
+
+# 2. Run the Simulation
 # Check if a custom simulation time was passed from the bash shell
 if {[info exists env(SIM_TIME)]} {
     set run_time $env(SIM_TIME)
 } else {
-    set run_time "1ms" ;
+    set run_time "-all" ;
 }
 
 echo "Running simulation for: $run_time"
 run $run_time
 
-# 5. Control Wave Window Zoom 
-# Options: 'wave zoom full' fits everything, or specify a precise time window range
+# 3. Open required GUI panes
+view structure
+view signals
+view wave
+
+# 4. Clear any existing signals from the wave window
+delete wave *
+
+config wave -signalnamewidth 1
+
+# 5. Populate the wave window with the logged data
+add wave -divider "NEORV32 CFS"
+add wave /neorv32_tb/neorv32_top_inst/io_system/neorv32_cfs_enabled/neorv32_cfs_inst/*
+
+add wave -divider "TPU Classifier"
+add wave /neorv32_tb/neorv32_top_inst/io_system/neorv32_cfs_enabled/neorv32_cfs_inst/classifier_inst/*
+
+# 6. Adjust zoom so you can see the results immediately
 wave zoom full
-# Alternative example: wave zoom range 0ms 2ms
 
 # 6. Add and Position a Simulation Cursor
 # Create a named cursor, place it at a designated time, and focus the view on it

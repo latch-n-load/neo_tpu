@@ -88,11 +88,11 @@ fi
 
 # Check for Waveforms (Argument 2)
 if [ "$2" == "wave" ]; then
-  echo -e "${YELLOW}[INFO] Running vsim simulation in GUI Mode...${NC}";
-  runcmd="$VSIM -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
+  echo -e "${YELLOW}[INFO] Running vsim simulation in Wave Mode...${NC}";
+  runcmd="$VSIM -voptargs="+acc" -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
 else
   echo -e "${YELLOW}[INFO] Running vsim simulation in Console Mode...${NC}";
-  runcmd="$VSIM -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do \"run -\$SIM_TIME; quit -f\""
+  runcmd="$VSIM -voptargs="+acc" -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do \"run \$SIM_TIME; quit -f\""
 fi
 
 eval "$runcmd" 2>&1 | tee vsim.log

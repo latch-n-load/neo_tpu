@@ -131,15 +131,15 @@ begin
   generic map (
     -- General --
     CLOCK_FREQUENCY     => CLOCK_FREQUENCY,
-    TRACE_PORT_EN       => true,
+    TRACE_PORT_EN       => false, -- Ale
     DUAL_CORE_EN        => DUAL_CORE_EN,
     -- Boot Configuration --
     BOOT_MODE_SELECT    => BOOT_MODE_SELECT,
     BOOT_ADDR_CUSTOM    => BOOT_ADDR_CUSTOM,
     -- On-Chip Debugger (OCD) --
-    OCD_EN              => true,
+    OCD_EN              => false, -- Ale
     OCD_NUM_HW_TRIGGERS => 3,
-    OCD_AUTHENTICATION  => true,
+    OCD_AUTHENTICATION  => false, -- Ale
     -- RISC-V CPU Extensions --
     RISCV_ISA_C         => RISCV_ISA_C,
     RISCV_ISA_E         => RISCV_ISA_E,
@@ -208,34 +208,34 @@ begin
     IO_UART0_EN         => true,
     IO_UART0_RX_FIFO    => 32,
     IO_UART0_TX_FIFO    => 32,
-    IO_UART1_EN         => true,
+    IO_UART1_EN         => false, -- Ale
     IO_UART1_RX_FIFO    => 1,
     IO_UART1_TX_FIFO    => 1,
-    IO_SPI_EN           => true,
+    IO_SPI_EN           => false, -- Ale
     IO_SPI_FIFO         => 4,
-    IO_SDI_EN           => true,
+    IO_SDI_EN           => false, -- Ale
     IO_SDI_FIFO         => 4,
-    IO_TWI_EN           => true,
+    IO_TWI_EN           => false, -- Ale
     IO_TWI_FIFO         => 4,
-    IO_TWD_EN           => true,
+    IO_TWD_EN           => false, -- Ale
     IO_TWD_RX_FIFO      => 4,
     IO_TWD_TX_FIFO      => 4,
-    IO_PWM_NUM          => 8,
-    IO_WDT_EN           => true,
-    IO_TRNG_EN          => true,
+    IO_PWM_NUM          => 0, -- Ale
+    IO_WDT_EN           => false, -- Ale
+    IO_TRNG_EN          => false, -- Ale
     IO_TRNG_FIFO        => 4,
     IO_CFS_EN           => true,
-    IO_NEOLED_EN        => true,
+    IO_NEOLED_EN        => false, -- Ale
     IO_NEOLED_TX_FIFO   => 8,
     IO_GPTMR_NUM        => 4,
-    IO_ONEWIRE_EN       => true,
+    IO_ONEWIRE_EN       => false, -- Ale
     IO_ONEWIRE_FIFO     => 8,
     IO_DMA_EN           => true,
     IO_DMA_DSC_FIFO     => 8,
-    IO_SLINK_EN         => true,
+    IO_SLINK_EN         => false, -- Ale
     IO_SLINK_RX_FIFO    => 4,
     IO_SLINK_TX_FIFO    => 1,
-    IO_TRACER_EN        => true,
+    IO_TRACER_EN        => false, -- Ale
     IO_TRACER_BUFFER    => 32,
     IO_TRACER_SIMLOG_EN => TRACE_LOG_EN
   )

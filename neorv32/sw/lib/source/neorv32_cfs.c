@@ -35,7 +35,7 @@ int neorv32_cfs_available(void) {
 void neorv32_cfs_write_reg(uint32_t reg, uint32_t value) {
   // Pointer Initialization: Calls our inline function to get the base address of the hardware.
   volatile uint32_t *base = neorv32_cfs_word_base();
-  neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS write addr: %s, value: %x\n", cfs_reg_names[reg], value);
+  // neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS write addr: %s, value: %x\n", cfs_reg_names[reg], value);
 
   // Array Indexing / Pointer Arithmetic: Jumps 'reg' spaces forward from 'base' and writes the data to silicon.
   base[reg] = value;
@@ -120,10 +120,12 @@ uint32_t neorv32_cfs_wait_for_result(uint32_t *prediction) {
   while ((neorv32_cfs_read_reg(CFS_REG_STATUS) & CFS_STATUS_DONE_BIT) == 0u) {
     /* busy wait until the classifier completes */
   }
+  neorv32_uart0_printf("DEBUG neorv32_cfs.c: Busy-wait done. Read @ %s, value: %x\n", cfs_reg_names[CFS_REG_STATUS], neorv32_cfs_read_reg(CFS_REG_STATUS));  
 
   // Pointer Dereferencing: Follows the pointer to the original variable and overwrites it with the hardware's result.
   *prediction = neorv32_cfs_read_reg(CFS_REG_RESULT);
-  
+  neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS prediction read @ %s, value: %x\n", cfs_reg_names[CFS_REG_RESULT], *prediction);
+
   // Returns the final state of the hardware STATUS register to the main program.
   return neorv32_cfs_read_reg(CFS_REG_STATUS);
 }
