@@ -6,6 +6,10 @@
 // Includes the header file that defines hardware addresses and constants
 #include "neorv32_cfs.h"
 
+volatile uint32_t neorv32_cfs_irq_status = 0u;
+volatile uint32_t neorv32_cfs_irq_prediction = 0u;
+volatile uint32_t neorv32_cfs_irq_pending = 0u;
+
 // Lookup for print debug matching the enum order
  const char* cfs_reg_names[] = {
   "CFS_REG_CONTROL",
@@ -69,8 +73,31 @@ void neorv32_cfs_clear_irq(void) {
   neorv32_cfs_write_reg(CFS_REG_CONTROL, CFS_CTRL_CLEAR_IRQ_BIT);
 }
 
+void neorv32_cfs_irq_enable(void) {
+  neorv32_cfs_irq_status = 0u;
+  neorv32_cfs_irq_prediction = 0u;
+  neorv32_cfs_irq_pending = 0u;
+  neorv32_rte_handler_install(CFS_TRAP_CODE, neorv32_cfs_irq_handler);
+  neorv32_cpu_csr_set(CSR_MSTATUS, (1u << CSR_MSTATUS_MIE));
+  neorv32_cpu_csr_set(CSR_MIE, (1u << CFS_FIRQ_ENABLE));
+}
+
+void neorv32_cfs_irq_disable(void) {
+  neorv32_cpu_csr_clr(CSR_MIE, (1u << CFS_FIRQ_ENABLE));
+  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS interrupt disabled.\n");
+
+}
+
+void neorv32_cfs_irq_handler(void) {
+  neorv32_cfs_irq_status = neorv32_cfs_read_reg(CFS_REG_STATUS);
+  neorv32_cfs_irq_prediction = neorv32_cfs_read_reg(CFS_REG_RESULT);
+  neorv32_cfs_irq_pending = 1u;
+  neorv32_cfs_clear_irq();
+}
+
 void neorv32_cfs_start_inference(void) {
   neorv32_cfs_write_reg(CFS_REG_CONTROL, CFS_CTRL_START_BIT);
+  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Start sent to TPU.\n");
 }
 
 // Pointers: Takes a read-only ("const") pointer to an array of 8-bit bytes (pixels), and the total count.
@@ -113,7 +140,7 @@ void neorv32_cfs_load_image(const uint8_t *pixel_array, uint32_t pixel_count) {
 }
 
 // Pass-by-Reference: Takes a pointer ("*prediction") to a variable created elsewhere so it can write the answer there.
-uint32_t neorv32_cfs_wait_for_result(uint32_t *prediction) {
+uint32_t neorv32_cfs_busy_wait_result(uint32_t *prediction) {
   // Busy-Waiting & Bitwise ops: 
   // Reads the hardware STATUS register, uses AND ("&") to isolate the DONE_BIT. 
   // It stays trapped in this empty loop as long as the result is 0 (hardware is not done yet).
@@ -128,4 +155,16 @@ uint32_t neorv32_cfs_wait_for_result(uint32_t *prediction) {
 
   // Returns the final state of the hardware STATUS register to the main program.
   return neorv32_cfs_read_reg(CFS_REG_STATUS);
+}
+
+uint32_t neorv32_cfs_wait_for_result_irq(uint32_t *prediction) {
+  neorv32_cfs_irq_pending = 0u;
+
+  while (neorv32_cfs_irq_pending == 0u) {
+    neorv32_uart0_printf("[DEBUG neorv32_cfs.c] NEORV32 Going to sleep, WFI from...\n");
+    neorv32_cpu_sleep();
+  }
+
+  *prediction = neorv32_cfs_irq_prediction;
+  return neorv32_cfs_irq_status;
 }

@@ -155,7 +155,7 @@ begin
       if (classifier_done_s = '1') then
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
-        report "DEBUG HW: @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
+        report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
                 & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
         irq_pending_reg <= '1';
       end if;
@@ -173,14 +173,10 @@ begin
           case std_logic_vector(bus_req_i.addr(15 downto 2)) is 
             when ctrl_word_addr_c    => bus_rsp_o.data <= cfs_reg_rd(0);
             when status_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(1);
-            when result_word_addr_c  => 
-              bus_rsp_o.data <= cfs_reg_rd(2);
-              
-              -- report "DEBUG HW: @" & to_string(now) & " Received Addr: " & 
-              -- integer'image (to_integer(unsigned(bus_req_i.addr(15 downto 2)))) & " | Data: "
-              -- & integer'image(to_integer(unsigned(cfs_reg_rd(2))));
-              report "DEBUG HW: @" & to_string(now) & " Received Addr: " & 
-              to_hstring(bus_req_i.addr(15 downto 2)) & " | Data: " & to_hstring(cfs_reg_rd(2));
+            when result_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(2);
+
+              -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " Received Addr: " & 
+              -- to_hstring(bus_req_i.addr(15 downto 2)) & " | Data: " & to_hstring(cfs_reg_rd(2));
 
             when version_word_addr_c => bus_rsp_o.data <= cfs_reg_rd(3);
             when others              => bus_rsp_o.data <= (others => '0');
@@ -199,7 +195,7 @@ begin
             -- bit3 : clear write-while-busy flag
             if (bus_req_i.data(0) = '1' and frame_loaded_reg = '1' and classifier_busy_s = '0') then
               classifier_start_s <= '1';
-              report "DEBUG HW: @" & to_string(now) & " Sending start = " & std_logic'image(bus_req_i.data(0));
+              report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " Received start = " & std_logic'image(bus_req_i.data(0));
             end if;
 
             if (bus_req_i.data(1) = '1') then
@@ -251,14 +247,14 @@ begin
                 end if;
 
                 -- Loop to extract 1b pixel from 32b pixels_this_word
-                report "DEBUG HW: @" & to_string(now) & " | Received Addr:" & integer'image(addr_word_v) 
-                & " | Data:" & to_hstring(bus_req_i.data) & " | Pixel Base:" & to_string(pixel_base_v);
+                -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | Received Addr:" & integer'image(addr_word_v) 
+                -- & " | Data:" & to_hstring(bus_req_i.data) & " | Pixel Base:" & to_string(pixel_base_v);
                 for bit_idx_v in 0 to 31 loop
                   if (bit_idx_v < pixels_this_word_v) then -- Check if pixel_this_word < 32
                     if (frame_valid(pixel_base_v + bit_idx_v) = '0') then -- Check if current pixel is invalid
                       frame_bits(pixel_base_v + bit_idx_v) <= bus_req_i.data(bit_idx_v); -- Write pixel bit from bus to frame
 
-                      -- report "DEBUG HW: @" & to_string(now) & " | frame_bits (" & to_string(pixel_base_v + bit_idx_v) 
+                      -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | frame_bits (" & to_string(pixel_base_v + bit_idx_v) 
                       -- & ") = " & to_string(bus_req_i.data(bit_idx_v));
                       
                       frame_valid(pixel_base_v + bit_idx_v) <= '1'; -- Set valid bit 
@@ -291,6 +287,18 @@ begin
   -- while '0' is mapped to 0x0000
   pixel_addr_int <= to_integer(unsigned(pixel_addr_s)); --Convert to int for lookup
   pixel_data_s <= q8_8_one_c when (pixel_addr_int < PIXELS and frame_bits(pixel_addr_int) = '1') else q8_8_zero_c;
+
+
+  -- DEBUG Monitor process to log pixel data updates
+  -- debug_pixel_monitor_proc: process
+  -- begin
+  --     wait on pixel_addr_s; -- Suspend the process until the address changes
+  --     wait for 0 ns; -- Wait one delta cycle for the concurrent logic to update pixel_data_s
+  --     --Print the result to the ModelSim Transcript
+  --     report "[DEBUG neorv32_cfs.vhd] @ " & to_string(now) & 
+  --     " RX from TPU Address: " & to_string(to_integer(unsigned(pixel_addr_s))) & 
+  --            " | TX Pixel Data: " & to_hstring(pixel_data_s);
+  -- end process;
 
   -- Instantiate MNIST classifier core ------------------------------------------
   classifier_inst : mnist_classifier_core

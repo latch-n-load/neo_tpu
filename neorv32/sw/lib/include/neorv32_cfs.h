@@ -71,9 +71,13 @@ void neorv32_cfs_clear_frame(void);
 void neorv32_cfs_clear_done(void);
 void neorv32_cfs_clear_error(void);
 void neorv32_cfs_clear_irq(void);
+void neorv32_cfs_irq_enable(void);
+void neorv32_cfs_irq_disable(void);
+void neorv32_cfs_irq_handler(void);
 void neorv32_cfs_start_inference(void);
 void neorv32_cfs_load_image(const uint8_t *pixel_array, uint32_t pixel_count);
-uint32_t neorv32_cfs_wait_for_result(uint32_t *prediction);
+uint32_t neorv32_cfs_busy_wait_result(uint32_t *prediction);
+uint32_t neorv32_cfs_wait_for_result_irq(uint32_t *prediction);
 /**@}*/
 
 #endif

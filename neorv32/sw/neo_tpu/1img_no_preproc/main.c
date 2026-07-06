@@ -28,9 +28,10 @@ int main(void) {
   uint32_t cyc_cnt;
   uint32_t sys_freq = NEORV32_SYSINFO->CLK;
 
-  /* Initialize exception handling and UART. */
+  /* Initialize CFS interrupt, exception handling and UART. */
   neorv32_rte_setup();
   neorv32_uart0_setup(BAUD_RATE, 0);
+  neorv32_cfs_irq_enable();
 
   /* Verify that the CFS peripheral is present. */
   if (neorv32_cfs_available() == 0) {
@@ -86,20 +87,20 @@ int main(void) {
     return 3;
   }
 
-  /* 4. Start inference and wait for completion. */
+  /* 4. Start inference and wait for completion via interrupt. */
   start_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
 
-  neorv32_uart0_printf("Starting inference.\n");
   neorv32_cfs_start_inference();
-  status_value = neorv32_cfs_wait_for_result(&prediction);
+  status_value = neorv32_cfs_wait_for_result_irq(&prediction);
 
   end_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
   cyc_cnt = end_cyc - start_cyc;
   uint32_t inf_t_us = (uint32_t)(((uint64_t)cyc_cnt * 1000000ULL) / sys_freq);
-  neorv32_uart0_printf("Inference time: %u us\n", inf_t_us);
 
-  neorv32_uart0_printf("Inference complete. Status=0x%x Prediction=%u\n",
-                       status_value, prediction);
+  neorv32_uart0_printf("Inference complete. Status=0x%x Prediction=%u Time-taken=%uus\n",
+                       status_value, prediction, inf_t_us);
+
+  neorv32_cfs_irq_disable();
 
   return 0;
 }
