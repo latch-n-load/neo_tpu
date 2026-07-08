@@ -1,5 +1,5 @@
 /**********************************************************************//**
- * @file neo_tpu_1img_nopreproc/main.c
+ * @file neo_tpu/main.c
  * @brief Simple CFS-driven MNIST inference demo for NEORV32.
  **************************************************************************/
 
@@ -101,6 +101,9 @@ int main(void) {
                        status_value, prediction, inf_t_us);
 
   neorv32_cfs_irq_disable();
+
+  // Raise GPIO 0 for sim_terminate in neorv32_tb.vhd
+  neorv32_gpio_pin_set(0, 1);
 
   return 0;
 }
