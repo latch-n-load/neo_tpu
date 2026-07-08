@@ -2,8 +2,8 @@
 # Color Definitions
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m' # Bold yellow stands out bright
-NC='\033[0m'        # No Color (Resets the terminal back to normal)
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 set -e
 
@@ -79,20 +79,29 @@ find ../../sim -type f -name '*.vhd' ! -name 'neorv32_tb.vhd' -exec $VCOM -work 
 echo -e "${YELLOW}[INFO] Compiling main testbench...${NC}"
 $VCOM -work neorv32 -2008 ../../sim/neorv32_tb.vhd
 
-# Check user argument
-if [ -n "$1" ]; then
-  export SIM_TIME="$1"
-else 
-  export SIM_TIME="all"
-fi
+# # Check user argument
+# if [ -n "$1" ]; then
+#   export SIM_TIME="$1"
+# else 
+#   export SIM_TIME="all"
+# fi
+
+# Ensure SIM_TIME defaults to "-all" if it was somehow left blank
+export SIM_TIME="${SIM_TIME:--all}"
 
 # Check for Waveforms (Argument 2)
-if [ "$2" == "wave" ]; then
-  echo -e "${YELLOW}[INFO] Running vsim simulation in Wave Mode...${NC}";
+if [ "$WAVE_EN" == "1" ]; then
+  echo "======================================================="
+  echo -e "${GREEN}[INFO] Running vsim simulation in Wave Mode...${NC}";
+  echo "======================================================="
   runcmd="$VSIM -voptargs="+acc" -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do ../vsim_wave.tcl"
 else
-  echo -e "${YELLOW}[INFO] Running vsim simulation in Console Mode...${NC}";
-  runcmd="$VSIM -voptargs="+acc" -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do \"run \$SIM_TIME; quit -f\""
+  echo "============================================================"
+  echo -e "${GREEN}[INFO] Running vsim simulation in Console Mode...${NC}";
+  echo "============================================================"
+  # runcmd="$VSIM -voptargs=\"+acc\" -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do 'set NumericStdNoWarnings 1; $WAVE_CMD run $SIM_TIME; quit -f'"
+  runcmd="$VSIM -voptargs=\"+acc\" -c -t ns -L neorv32 -L tiny_tpu neorv32.neorv32_tb -do 'set NumericStdNoWarnings 1; run $SIM_TIME; quit -f'"
+
 fi
 
 eval "$runcmd" 2>&1 | tee vsim.log

@@ -203,7 +203,7 @@ begin
     XBUS_TIMEOUT        => 2048,
     XBUS_REGSTAGE_EN    => true,
     -- Processor peripherals --
-    IO_GPIO_NUM         => 32,
+    IO_GPIO_NUM         => 1, -- Ale
     IO_CLINT_EN         => true,
     IO_UART0_EN         => true,
     IO_UART0_RX_FIFO    => 32,
@@ -545,5 +545,14 @@ begin
     mem_req_i => xbus_fmem_data_req,
     mem_rsp_o => xbus_fmem_data_rsp
   );
+
+  -- Ale sim_termination using gpio for run -all
+  sim_terminate: process
+  begin
+    wait until gpio(0) = '1'; -- Wait for main.c to set GPIO pin 0 high
+    report "Software execution complete. Ending simulation." severity note;
+    std.env.finish;
+  end process;
+  -- /Ale
 
 end neorv32_tb_rtl;

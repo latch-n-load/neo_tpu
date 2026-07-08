@@ -10,7 +10,7 @@ volatile uint32_t neorv32_cfs_irq_status = 0u;
 volatile uint32_t neorv32_cfs_irq_prediction = 0u;
 volatile uint32_t neorv32_cfs_irq_pending = 0u;
 
-// Lookup for print debug matching the enum order
+// DEBUG: Lookup for print debug matching the enum order
  const char* cfs_reg_names[] = {
   "CFS_REG_CONTROL",
   "CFS_REG_STATUS",
@@ -39,7 +39,7 @@ int neorv32_cfs_available(void) {
 void neorv32_cfs_write_reg(uint32_t reg, uint32_t value) {
   // Pointer Initialization: Calls our inline function to get the base address of the hardware.
   volatile uint32_t *base = neorv32_cfs_word_base();
-  // neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS write addr: %s, value: %x\n", cfs_reg_names[reg], value);
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS write addr: %s, value: %x\n", cfs_reg_names[reg], value);
 
   // Array Indexing / Pointer Arithmetic: Jumps 'reg' spaces forward from 'base' and writes the data to silicon.
   base[reg] = value;
@@ -50,7 +50,7 @@ uint32_t neorv32_cfs_read_reg(uint32_t reg) {
   // Pointer Initialization: Gets the base address again.
   volatile uint32_t *base = neorv32_cfs_word_base();
   // Array Indexing: Reads the data directly from the hardware memory address.
-  // neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS read addr: %s, value: %x\n", cfs_reg_names[reg], base[reg]);
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS read addr: %s, value: %x\n", cfs_reg_names[reg], base[reg]);
   return base[reg];
 
 }
@@ -101,41 +101,37 @@ void neorv32_cfs_start_inference(void) {
 }
 
 // Pointers: Takes a read-only ("const") pointer to an array of 8-bit bytes (pixels), and the total count.
-void neorv32_cfs_load_image(const uint8_t *pixel_array, uint32_t pixel_count) {
-  // Pointer Arithmetic: Shifts the hardware base pointer forward to where the Tiny-TPU's image buffer starts.
+void neorv32_cfs_load_image(const uint8_t *pixel_array, uint32_t pixel_cnt) {
   volatile uint32_t *image = neorv32_cfs_word_base() + CFS_IMAGE_WORD_BASE;
-  // Integer Math: Calculates how many 32-bit words are needed to hold all the bits, rounding up.
-  uint32_t word_count = (pixel_count + 31u) / 32u;
+  
+  // Calculate bytes, 32-bit words, and left-over
+  uint32_t byte_cnt = (pixel_cnt + 7u) / 8u; // 784 pixels = 98 bytes
+  uint32_t word_cnt = byte_cnt / 4u;         // 96 bytes = 24 full 32-bit words
+  uint32_t leftover_bytes = byte_cnt % 4u;     // 98 % 4 = 2 leftover bytes (16 pixels)
 
-  // Standard C loop iterating through each 32-bit word we need to build.
-  for (uint32_t word = 0; word < word_count; ++word) {
-    // Initializes an unsigned 32-bit integer to 0. This will act as our "bucket" to pack bits into.
-    uint32_t packed = 0u;
-    // Calculates the starting pixel index for this specific 32-bit word.
-    uint32_t start_pixel = word * 32u;
+  const uint8_t *src = pixel_array; // Initialize byte pointer to base addr of pixel_array
+
+  // Process 32-bit words (4 bytes in parallel)
+  for (uint32_t w = 0; w < word_cnt; ++w) {
+    // Packed = B3 (MSB), B2, B1, B0 (LSB)
+    uint32_t packed = ((uint32_t)src[0])        | // Write current byte
+                      ((uint32_t)src[1] << 8)   | // Write current+1th byte shifted by 8
+                      ((uint32_t)src[2] << 16)  | // Write current+2th byte shifted by 16
+                      ((uint32_t)src[3] << 24);   // Write current+3th byte shifted by 24
     
-    // Ternary Operator (? :): If we have more than 32 pixels left, process 32. Otherwise, process the remainder.
-    uint32_t pixels_this_word = (start_pixel + 32u < pixel_count) ? 32u : pixel_count - start_pixel;
+    image[w] = packed;
+    src += 4; // Inc pointer by word size
+  }
 
-    // Loop through the individual pixels that belong in this 32-bit word.
-    for (uint32_t i = 0; i < pixels_this_word; ++i) {
-      // Calculates which byte in the original array holds our target pixel.
-      uint32_t byte_index = (start_pixel + i) / 8u;
-      // Calculates which specific bit inside that byte is our target pixel.
-      uint32_t bit_index = (start_pixel + i) % 8u;
-      
-      // Bitwise Operations:
-      // 1. ">> bit_index": Shifts our target bit to the far right.
-      // 2. "& 0x1u": Masks it to isolate just that single bit (checks if it is 1 or 0).
-      if ((pixel_array[byte_index] >> bit_index) & 0x1u) {
-        // Bitwise OR (|): If the pixel was 1, we shift a '1' into the correct spot ("<< i") and merge it into 'packed'.
-        packed |= (1u << i);
-      }
+  // For leftover_bytes -- 2 for MNIST
+  if (leftover_bytes > 0) {
+    uint32_t packed = 0u;
+    // Store 1 by 1
+    for (uint32_t i = 0; i < leftover_bytes; ++i) {
+      // src = 4*(24-1) = 95th byte, get 96th and 97th byte
+      packed |= ((uint32_t)src[i] << (i * 8));
     }
-
-    // Array Indexing: Writes the fully packed 32-bit word directly to the Tiny-TPU hardware memory.
-    image[word] = packed;
-    // neorv32_uart0_printf("DEBUG neorv32_cfs.c: Wrote @ %x = %x\n", (uint32_t)&image[word], packed);
+    image[word_cnt] = packed; // Write as the last partial word
   }
 }
 
@@ -147,11 +143,11 @@ uint32_t neorv32_cfs_busy_wait_result(uint32_t *prediction) {
   while ((neorv32_cfs_read_reg(CFS_REG_STATUS) & CFS_STATUS_DONE_BIT) == 0u) {
     /* busy wait until the classifier completes */
   }
-  neorv32_uart0_printf("DEBUG neorv32_cfs.c: Busy-wait done. Read @ %s, value: %x\n", cfs_reg_names[CFS_REG_STATUS], neorv32_cfs_read_reg(CFS_REG_STATUS));  
+  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Busy-wait done. Read @ %s, value: %x\n", cfs_reg_names[CFS_REG_STATUS], neorv32_cfs_read_reg(CFS_REG_STATUS));  
 
   // Pointer Dereferencing: Follows the pointer to the original variable and overwrites it with the hardware's result.
   *prediction = neorv32_cfs_read_reg(CFS_REG_RESULT);
-  neorv32_uart0_printf("DEBUG neorv32_cfs.c: CFS prediction read @ %s, value: %x\n", cfs_reg_names[CFS_REG_RESULT], *prediction);
+  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS prediction read @ %s, value: %x\n", cfs_reg_names[CFS_REG_RESULT], *prediction);
 
   // Returns the final state of the hardware STATUS register to the main program.
   return neorv32_cfs_read_reg(CFS_REG_STATUS);
@@ -161,7 +157,7 @@ uint32_t neorv32_cfs_wait_for_result_irq(uint32_t *prediction) {
   neorv32_cfs_irq_pending = 0u;
 
   while (neorv32_cfs_irq_pending == 0u) {
-    neorv32_uart0_printf("[DEBUG neorv32_cfs.c] NEORV32 Going to sleep, WFI from...\n");
+    neorv32_uart0_printf("[DEBUG neorv32_cfs.c] NEORV32 Going to sleep, WFI from TPU...\n");
     neorv32_cpu_sleep();
   }
 
