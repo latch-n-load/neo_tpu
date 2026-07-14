@@ -2,7 +2,7 @@
 # Use this makefile to configure all relevant CPU / compiler options.
 
 # Use this statement in shell to make firmware:
-# make USER_FLAGS+=-DUART0_SIM_MODE clean_all all
+# make clean_all all
 
 # Use # Use this statement in run vsim in console mode:
 # make vsim

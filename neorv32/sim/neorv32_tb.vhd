@@ -59,9 +59,9 @@ entity neorv32_tb is
     DMEM_EN           : boolean                        := true;        -- implement processor-internal data memory
     DMEM_BASE         : std_ulogic_vector(31 downto 0) := x"80000000"; -- base address of processor-internal data memory (naturally aligned)
     DMEM_SIZE         : natural                        := 8*1024;      -- size of processor-internal data memory in bytes (use a power of 2)
-    ICACHE_EN         : boolean                        := true;        -- implement instruction cache
+    ICACHE_EN         : boolean                        := false;        -- Ale - implement instruction cache
     ICACHE_NUM_BLOCKS : natural range 1 to 4096        := 64;          -- i-cache: number of blocks, has to be a power of 2
-    DCACHE_EN         : boolean                        := true;        -- implement data cache
+    DCACHE_EN         : boolean                        := false;        -- Ale - implement data cache
     DCACHE_NUM_BLOCKS : natural range 1 to 4096        := 32;          -- d-cache: number of blocks, has to be a power of 2
     CACHE_BLOCK_SIZE  : natural range 4 to 1024        := 32;          -- i-cache/d-cache: block size in bytes, has to be a power of 2
     CACHE_BURSTS_EN   : boolean                        := true;        -- enable issuing of burst transfer for cache update
