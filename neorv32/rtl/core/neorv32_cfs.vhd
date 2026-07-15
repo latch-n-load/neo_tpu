@@ -14,10 +14,10 @@ entity neorv32_cfs is
     PIXELS : integer := 784;
     PIXEL_ADDR_WIDTH : integer := index_size_f(784);
     PIXEL_BASE_ADDR_REG : integer := 16#100#; -- Pixel base register at 0x100
-    W1_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
-    B1_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
-    W2_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
-    B2_INIT_FILE : string := "/home/ale/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
+    W1_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
+    B1_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
+    W2_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
+    B2_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
   );
   port (
     -- global control --
