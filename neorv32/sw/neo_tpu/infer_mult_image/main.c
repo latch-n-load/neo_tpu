@@ -1,6 +1,9 @@
 /**********************************************************************//**
  * @file neo_tpu/main.c
- * @brief Simple CFS-driven MNIST inference demo for NEORV32.
+ * @brief Inference of multiple images in CFS-TPU with NEORV32 DMA loading.
+ * @details Images available as grayscale ( Contains a ready image as binary array of 784 pixels (1 pixel = 1 bit)
+ * stored as constants in IMEM of NEORV32 (No DMA). Pixels are loaded by NEORV32 to
+ * TinyTPU, starts inference and awaits result interrupt using WFI.
  **************************************************************************/
 
 #include <neorv32.h>

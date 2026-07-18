@@ -185,12 +185,12 @@ begin
     IMEM_EN             => IMEM_EN,
     IMEM_BASE           => IMEM_BASE,
     IMEM_SIZE           => IMEM_SIZE,
-    IMEM_OUTREG_EN      => false,
+    IMEM_OUTREG_EN      => true, -- Ale enabled for better timing
     -- Internal Data memory --
     DMEM_EN             => DMEM_EN,
     DMEM_BASE           => DMEM_BASE,
     DMEM_SIZE           => DMEM_SIZE,
-    DMEM_OUTREG_EN      => true,
+    DMEM_OUTREG_EN      => true, -- Ale enabled for better timing
     -- CPU Caches --
     ICACHE_EN           => ICACHE_EN,
     ICACHE_NUM_BLOCKS   => ICACHE_NUM_BLOCKS,

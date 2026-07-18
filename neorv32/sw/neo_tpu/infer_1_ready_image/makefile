@@ -39,7 +39,7 @@ USER_FLAGS += -DUART0_SIM_MODE
 # GHDL_RUN_FLAGS += --wave=neo_tpu.ghw 
 
 # Set path to NEORV32 root directory
-NEORV32_HOME ?= ../..
+NEORV32_HOME ?= ../../..
 
 # Include the main NEORV32 makefile
 include $(NEORV32_HOME)/sw/common/common.mk
