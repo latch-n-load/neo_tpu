@@ -18,10 +18,20 @@
 set script_path [file normalize [info script]]
 set script_dir [file dirname $script_path]
 set neorv32_home $script_dir/../..
-set ip_logo $neorv32_home/docs/figures/neorv32_logo_riscv_small.png
+# Ale: Updated logo
+set ip_logo $neorv32_home/docs/figures/neorv32_tinytpu_logo.png
 set outputdir $script_dir/neorv32_vivado_ip_work
 set ip_top neorv32_vivado_ip
 
+# Ale
+# puts "script_dir = $script_dir"
+# script_dir = /home/a_akif/tesi/tesi_git/neorv32/rtl/system_integration
+# puts "neorv32_home = $neorv32_home"
+# neorv32_home = /home/a_akif/tesi/tesi_git/neorv32/rtl/system_integration/../..
+# puts "outputdir = $outputdir"
+# outputdir = /home/a_akif/tesi/tesi_git/neorv32/rtl/system_integration/neorv32_vivado_ip_work
+# return
+# /Ale
 
 # **************************************************************
 # Create empty (!) output/working directory
@@ -53,6 +63,21 @@ puts $file_list
 add_files $file_list
 set_property library neorv32 [get_files $file_list]
 
+# Ale
+# **************************************************************
+# Import TinyTPU Verilog source files
+# **************************************************************
+# neorv32_home = /home/a_akif/tesi/tesi_git/neorv32/rtl/system_integration/../..
+set tpu_rtl "$neorv32_home/../tiny-tpu/mnist_demo/rtl"
+set tpu_files [glob -nocomplain $tpu_rtl/*.v]
+puts "========================================================="
+puts "TinyTPU source files:"
+puts $tpu_files
+# Add the files and set their type using the variable
+add_files $tpu_files
+set_property file_type Verilog [get_files $tpu_files]
+#/Ale
+
 # IP top module and AXI4 bridge
 add_file $neorv32_home/rtl/system_integration/xbus2axi4_bridge.vhd
 add_file $neorv32_home/rtl/system_integration/$ip_top.vhd
@@ -65,10 +90,11 @@ update_compile_order -fileset sources_1
 # Package as IP block
 # **************************************************************
 ipx::package_project -root_dir $outputdir/packaged_ip -vendor NEORV32 -library user -taxonomy /UserIP -import_files -set_current true -force
-set_property display_name "NEORV32" [ipx::current_core]
-set_property vendor_display_name "neorv32" [ipx::current_core]
-set_property company_url https://github.com/stnolting/neorv32 [ipx::current_core]
-set_property description "The NEORV32 RISC-V Processor" [ipx::current_core]
+# Ale: Updated names to NEORV32_TinyTPU
+set_property display_name "NEORV32_TinyTPU" [ipx::current_core]
+set_property vendor_display_name "neorv32_tinytpu" [ipx::current_core]
+set_property company_url https://github.com/latch-n-load/neo_tpu [ipx::current_core]
+set_property description "NEORV32 with TinyTPU integrated as CFS" [ipx::current_core]
 
 
 # **************************************************************
