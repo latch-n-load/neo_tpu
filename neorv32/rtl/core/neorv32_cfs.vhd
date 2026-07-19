@@ -155,8 +155,8 @@ begin
       if (classifier_done_s = '1') then
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
-        report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
-                & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
+        -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
+        --         & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
         irq_pending_reg <= '1';
       end if;
 
@@ -170,7 +170,7 @@ begin
           -- report "Time: " & to_string(now) & " | bus_req.addr: 0x" & to_hstring(bus_req_i.addr) 
           -- & " | Data: 0x" & to_hstring(bus_req_i.data) & " | RW: " & to_string(bus_req_i.rw) 
           -- & " | BEN: " & to_string(bus_req_i.ben) & " | STB: " & to_string(bus_req_i.stb);
-          case std_logic_vector(bus_req_i.addr(15 downto 2)) is 
+          case std_ulogic_vector(bus_req_i.addr(15 downto 2)) is 
             when ctrl_word_addr_c    => bus_rsp_o.data <= cfs_reg_rd(0);
             when status_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(1);
             when result_word_addr_c  => bus_rsp_o.data <= cfs_reg_rd(2);
@@ -185,7 +185,7 @@ begin
         -- Write access ---------------------------------------------------------
         else -- rw = 1 for write_en
           -- If control_reg is accessed
-          if (std_logic_vector(bus_req_i.addr(15 downto 2)) = ctrl_word_addr_c) then
+          if (std_ulogic_vector(bus_req_i.addr(15 downto 2)) = ctrl_word_addr_c) then
             cfs_reg_wr(0) <= bus_req_i.data;
 
             -- Control bits:
