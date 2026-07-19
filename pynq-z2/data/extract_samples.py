@@ -8,8 +8,8 @@ NUM_SAMPLES = 5
 def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, num_samples: int):
     """
     Extracts a variable number of samples (2-10) from MNIST IDX files.
-    Generates unified .bin and .memh files for DMA loading, and individual 
-    labeled JPEGs for visual verification.
+    Generates unified .bin, .memh, and .coe files for DMA/BRAM loading, 
+    and individual labeled JPEGs for visual verification.
     """
     # Defensive check for your requirements
     if not (2 <= num_samples <= 10):
@@ -63,9 +63,34 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
     print(f"  [+] Unified image memh saved to:   {memh_img_file}")
     print(f"  [+] Unified label memh saved to:   {memh_lbl_file}")
 
+    # 5. Export Unified COE File for Vivado BRAM (.coe)
+    # Packs four 8-bit pixels into 32-bit words, LSB first.
+    coe_img_file = out_dir / f"all_{num_samples}_images.coe"
+    flat_pixels = images.ravel()
+    
+    # 784 pixels per image is perfectly divisible by 4, so no padding is required
+    words_32bit = []
+    for i in range(0, len(flat_pixels), 4):
+        p0 = flat_pixels[i]
+        p1 = flat_pixels[i+1]
+        p2 = flat_pixels[i+2]
+        p3 = flat_pixels[i+3]
+        
+        # Pack LSB first: p0 is at the lowest 8 bits, p3 is at the highest 8 bits
+        word = (p3 << 24) | (p2 << 16) | (p1 << 8) | p0
+        words_32bit.append(f"{word:08X}")
+
+    with open(coe_img_file, 'w', encoding="ascii") as f:
+        f.write("memory_initialization_radix=16;\n")
+        f.write("memory_initialization_vector=\n")
+        f.write(",\n".join(words_32bit))
+        f.write(";\n") # Vivado requires the final entry to end with a semicolon
+        
+    print(f"  [+] Unified image COE saved to:    {coe_img_file}")
+
     print("\n[*] Generating visual JPEG renders...")
     
-    # 5. Export Individual Visual Assets (JPEGs)
+    # 6. Export Individual Visual Assets (JPEGs)
     for i in range(num_samples):
         img_matrix = images[i]
         label = labels[i]
