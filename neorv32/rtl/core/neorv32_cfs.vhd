@@ -14,10 +14,10 @@ entity neorv32_cfs is
     PIXELS : integer := 784;
     PIXEL_ADDR_WIDTH : integer := index_size_f(784);
     PIXEL_BASE_ADDR_REG : integer := 16#100#; -- Pixel base register at 0x100
-    W1_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
-    B1_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
-    W2_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
-    B2_INIT_FILE : string := "../../../tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
+    W1_INIT_FILE : string := "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w1_tiled_q8_8.memh";
+    B1_INIT_FILE : string := "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b1_q8_8.memh";
+    W2_INIT_FILE : string := "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/w2_tiled_q8_8.memh";
+    B2_INIT_FILE : string := "/home/a_akif/tesi/tesi_git/tiny-tpu/mnist_demo/data/model/reference/b2_q8_8.memh"
   );
   port (
     -- global control --
@@ -40,19 +40,19 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   -- The NEORV32 CFS example uses a simple 32-bit word-addressed register space.
   -- We keep the first four words for control/status/result/version and use the
   -- image base address to store the packed 784-bit MNIST frame.
-  constant ctrl_word_addr_c     : std_logic_vector(13 downto 0) := "00000000000000";
-  constant status_word_addr_c   : std_logic_vector(13 downto 0) := "00000000000001";
-  constant result_word_addr_c   : std_logic_vector(13 downto 0) := "00000000000010";
-  constant version_word_addr_c  : std_logic_vector(13 downto 0) := "00000000000011";
+  constant ctrl_word_addr_c     : std_ulogic_vector(13 downto 0) := "00000000000000";
+  constant status_word_addr_c   : std_ulogic_vector(13 downto 0) := "00000000000001";
+  constant result_word_addr_c   : std_ulogic_vector(13 downto 0) := "00000000000010";
+  constant version_word_addr_c  : std_ulogic_vector(13 downto 0) := "00000000000011";
+  constant version_value_c        : std_ulogic_vector(31 downto 0) := x"4D4E4953";
   constant image_base_word_addr_c : natural := PIXEL_BASE_ADDR_REG / 4;
   constant image_word_count_c     : natural := (PIXELS + 31) / 32; -- Since 784 % 32 != 0, ceil to nearest word integer
   constant image_last_word_addr_c : natural := image_base_word_addr_c + image_word_count_c - 1;
-  constant version_value_c        : std_logic_vector(31 downto 0) := x"4D4E4953";
   constant q8_8_one_c             : std_logic_vector(15 downto 0) := x"0100";
   constant q8_8_zero_c            : std_logic_vector(15 downto 0) := x"0000";
 
   -- Generate 4 (read) and 4 (write) 32-bit registers
-  type cfs_regs_t is array (0 to 3) of std_logic_vector(31 downto 0);
+  type cfs_regs_t is array (0 to 3) of std_ulogic_vector(31 downto 0);
   signal cfs_reg_wr : cfs_regs_t;
   signal cfs_reg_rd : cfs_regs_t;
 
@@ -73,7 +73,7 @@ architecture neorv32_cfs_rtl of neorv32_cfs is
   signal pixel_addr_int     : integer range 0 to PIXELS;
   signal done_reg           : std_logic;
   signal prediction_reg     : std_logic_vector(3 downto 0);
-  signal status_reg         : std_logic_vector(31 downto 0);
+  signal status_reg         : std_ulogic_vector(31 downto 0);
   signal irq_pending_reg    : std_logic;
 
   -- mnist_classifier_core component declaration --------------------------------
@@ -122,7 +122,7 @@ begin
   -- CFS READONLY registers: 0: Control (Write Only so Reads 0), 1: Status, 2: Result, 3: Version
   cfs_reg_rd(0) <= (others => '0');
   cfs_reg_rd(1) <= status_reg;
-  cfs_reg_rd(2) <= std_logic_vector(resize(unsigned(prediction_reg), 32));
+  cfs_reg_rd(2) <= std_ulogic_vector(resize(unsigned(prediction_reg), 32));
   cfs_reg_rd(3) <= version_value_c;
 
   -- Bus interface --------------------------------------------------------------
