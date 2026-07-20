@@ -155,8 +155,8 @@ begin
       if (classifier_done_s = '1') then
         done_reg <= '1';
         prediction_reg <= classifier_prediction_s;
-        report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
-                & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
+        -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " | done_reg:" & std_logic'image(classifier_done_s) 
+        --         & " | prediction_reg:" & integer'image(to_integer(unsigned(std_logic_vector(classifier_prediction_s))));
         irq_pending_reg <= '1';
       end if;
 
@@ -198,7 +198,7 @@ begin
             -- bit3 : clear write-while-busy flag
             if (bus_req_i.data(0) = '1' and frame_loaded_reg = '1' and classifier_busy_s = '0') then
               classifier_start_s <= '1';
-              report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " Received start = " & std_logic'image(bus_req_i.data(0));
+              -- report "[DEBUG neorv32_cfs.vhd] @" & to_string(now) & " Received start = " & std_logic'image(bus_req_i.data(0));
             end if;
 
             if (bus_req_i.data(1) = '1') then
