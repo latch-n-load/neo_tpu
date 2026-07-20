@@ -1,7 +1,7 @@
 /**********************************************************************//**
  * @file neo_tpu/main.c
- * @brief Inference of multiple images in CFS-TPU with NEORV32 DMA loading.
- * @details Images available as grayscale ( Contains a ready image as binary array of 784 pixels (1 pixel = 1 bit)
+ * @brief Simple CFS-driven MNIST inference demo for NEORV32.
+ * @details Contains a ready image as binary array of 784 pixels (1 pixel = 1 bit)
  * stored as constants in IMEM of NEORV32 (No DMA). Pixels are loaded by NEORV32 to
  * TinyTPU, starts inference and awaits result interrupt using WFI.
  **************************************************************************/
@@ -9,9 +9,41 @@
 #include <neorv32.h>
 #include "neorv32_cfs.h"
 
+#define EN_TIME // Macro for getting timing results
+
 #define BAUD_RATE 19200u
 #define PIXEL_COUNT 784u
 #define PIXEL_ENTRY_COUNT 98u
+
+static uint8_t has_zicntr = 0;
+static uint32_t sys_freq = 0;
+
+/**
+ * @brief Macro to wrap and time a block of code.
+ * Bypasses reading CSR_MCYCLE if the hardware counters are missing.
+ * Timer sleeps with the CPU, hence WFI generates incorrect durations
+ */
+#ifdef EN_TIME
+  #define GET_TIME_US(step_name_str, code_block) \
+    do { \
+      uint32_t _start = 0, _end = 0; \
+      if (has_zicntr) { _start = neorv32_cpu_csr_read(CSR_MCYCLE); } \
+      \
+      code_block \
+      \
+      if (has_zicntr) { \
+        _end = neorv32_cpu_csr_read(CSR_MCYCLE); \
+        uint32_t _cnt = _end - _start; \
+        uint32_t _ns = (uint32_t)((((uint64_t)(_end - _start)) * 1000000000ULL) / sys_freq); \
+        neorv32_uart0_printf("[TIMER] %s | MCYCLE_cnt: %u, time: %u ns\n", step_name_str, _cnt,_ns); \
+      } \
+    } while(0)
+  #else
+    #define GET_TIME_US(step_name_str, code_block) \
+      do { \
+        code_block \
+      } while(0)
+#endif
 
 int main(void) {
   uint8_t pixel_array[PIXEL_ENTRY_COUNT] = {0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	
@@ -25,39 +57,38 @@ int main(void) {
   uint32_t status_value;
   uint32_t prediction;
 
-  // Timing variables
-  uint32_t start_cyc;
-  uint32_t end_cyc;
-  uint32_t cyc_cnt;
-  uint32_t sys_freq = NEORV32_SYSINFO->CLK;
-
   /* Initialize CFS interrupt, exception handling and UART. */
   neorv32_rte_setup();
   neorv32_uart0_setup(BAUD_RATE, 0);
   neorv32_cfs_irq_enable();
+  
+  sys_freq = NEORV32_SYSINFO->CLK;
+
+  /* Safely check if the Zicntr extension (base counters) is implemented in hardware */
+  has_zicntr = (neorv32_cpu_csr_read(CSR_MXISA) & (1 << CSR_MXISA_ZICNTR)) != 0;
+    // NEORV32_SYSINFO->CPU_FEATURES & (1 << NEORV32_SYSINFO_CPU_FEATURES_ZICNTR)) != 0;
 
   /* Verify that the CFS peripheral is present. */
   if (neorv32_cfs_available() == 0) {
-    neorv32_uart0_printf("Error! No CFS synthesized!\n");
+    neorv32_uart0_printf("[ERROR] No CFS synthesized!\n");
     return 1;
   }
 
-  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU Singular Image inference without Preprocessing >>>\n");
+  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU Singular Ready Image Inference >>>\n\n");
+  
+  if (!has_zicntr) {
+    neorv32_uart0_printf("[WARNING] Zicntr hardware counters DISABLED. Timing skipped.\n");
+  }
 
   /* 1. Read and check the version register. */
-  start_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-
+  GET_TIME_US("Version read", {
   version_value = neorv32_cfs_read_reg(CFS_REG_VERSION);
+  });
   neorv32_uart0_printf("Version register: 0x%x\n", version_value);
-
-  end_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-  cyc_cnt = end_cyc - start_cyc;
-  uint32_t ver_t_us = (uint32_t)(((uint64_t)cyc_cnt * 1000000ULL) / sys_freq);
-  neorv32_uart0_printf("Version read time: %u us\n", ver_t_us);
-
+  
 
   if (version_value != CFS_VERSION_VALUE) {
-    neorv32_uart0_printf("Error! Unexpected version value.\n");
+    neorv32_uart0_printf("[ERROR] Unexpected version value.\n");
     return 2;
   }
 
@@ -68,40 +99,33 @@ int main(void) {
   neorv32_uart0_printf("Status after clear: 0x%x\n", status_value);
 
   if ((status_value & CFS_STATUS_DONE_BIT) != 0u) {
-    neorv32_uart0_printf("Warning: done flag was already set.\n");
+    neorv32_uart0_printf("[WARNING] Done flag was already set.\n");
   }
 
   /* 3. Load the 784 pixels into the CFS image buffer. */
-  start_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-
   neorv32_uart0_printf("Loading %u pixels into the image buffer.\n", PIXEL_COUNT);
+  
+  GET_TIME_US("Pixel load", {
   neorv32_cfs_load_image(pixel_array, PIXEL_COUNT);
-
-  end_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-  cyc_cnt = end_cyc - start_cyc;
-  uint32_t pix_ld_t_us = (uint32_t)(((uint64_t)cyc_cnt * 1000000ULL) / sys_freq);
-  neorv32_uart0_printf("Pixel load time: %u us\n", pix_ld_t_us);
+  });
 
   status_value = neorv32_cfs_read_reg(CFS_REG_STATUS);
-  neorv32_uart0_printf("Status after load: 0x%x\n", status_value);
+  neorv32_uart0_printf("Frame loaded flag: %u\n", (status_value && CFS_STATUS_FRAME_LOADED_BIT));
 
   if ((status_value & CFS_STATUS_FRAME_LOADED_BIT) == 0u) {
-    neorv32_uart0_printf("Error! Image was not marked as loaded.\n");
+    neorv32_uart0_printf("[ERROR] Image was not marked as loaded.\n");
     return 3;
   }
 
   /* 4. Start inference and wait for completion via interrupt. */
-  start_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-
+  neorv32_uart0_printf("\nStarting Inference...\n");
+  GET_TIME_US("Inference", {
   neorv32_cfs_start_inference();
   status_value = neorv32_cfs_wait_for_result_irq(&prediction);
+  });
 
-  end_cyc = neorv32_cpu_csr_read(CSR_MCYCLE);
-  cyc_cnt = end_cyc - start_cyc;
-  uint32_t inf_t_us = (uint32_t)(((uint64_t)cyc_cnt * 1000000ULL) / sys_freq);
-
-  neorv32_uart0_printf("Inference complete. Status=0x%x Prediction=%u Time-taken=%uus\n",
-                       status_value, prediction, inf_t_us);
+  neorv32_uart0_printf("\nInference complete. Done flag = %u Prediction = %u\n",
+                       (status_value && CFS_STATUS_BUSY_BIT), prediction);
 
   neorv32_cfs_irq_disable();
 
@@ -110,4 +134,3 @@ int main(void) {
 
   return 0;
 }
-

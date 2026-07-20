@@ -9,6 +9,8 @@
 #include <neorv32.h>
 #include "neorv32_cfs.h"
 
+#define EN_TIME // Macro for getting timing results
+
 #define BAUD_RATE 19200u
 #define PIXEL_COUNT 784u
 #define PIXEL_ENTRY_COUNT 98u
@@ -19,21 +21,29 @@ static uint32_t sys_freq = 0;
 /**
  * @brief Macro to wrap and time a block of code.
  * Bypasses reading CSR_MCYCLE if the hardware counters are missing.
+ * Timer sleeps with the CPU, hence WFI generates incorrect durations
  */
-#define GET_TIME_US(step_name_str, code_block) \
-  do { \
-    uint32_t _start = 0, _end = 0; \
-    if (has_zicntr) { _start = neorv32_cpu_csr_read(CSR_MCYCLE); } \
-    \
-    code_block \
-    \
-    if (has_zicntr) { \
-      _end = neorv32_cpu_csr_read(CSR_MCYCLE); \
-      uint32_t _us = (uint32_t)((((uint64_t)(_end - _start)) * 1000000ULL) / sys_freq); \
-      neorv32_uart0_printf("%s time: %u us\n", step_name_str, _us); \
-    } \
-  } while(0)
-
+#ifdef EN_TIME
+  #define GET_TIME_US(step_name_str, code_block) \
+    do { \
+      uint32_t _start = 0, _end = 0; \
+      if (has_zicntr) { _start = neorv32_cpu_csr_read(CSR_MCYCLE); } \
+      \
+      code_block \
+      \
+      if (has_zicntr) { \
+        _end = neorv32_cpu_csr_read(CSR_MCYCLE); \
+        uint32_t _cnt = _end - _start; \
+        uint32_t _ns = (uint32_t)((((uint64_t)(_end - _start)) * 1000000000ULL) / sys_freq); \
+        neorv32_uart0_printf("[TIMER] %s | MCYCLE_cnt: %u, time: %u ns\n", step_name_str, _cnt,_ns); \
+      } \
+    } while(0)
+  #else
+    #define GET_TIME_US(step_name_str, code_block) \
+      do { \
+        code_block \
+      } while(0)
+#endif
 
 int main(void) {
   uint8_t pixel_array[PIXEL_ENTRY_COUNT] = {0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	0x00,	
@@ -64,7 +74,7 @@ int main(void) {
     return 1;
   }
 
-  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU Singular Image inference without Preprocessing >>>\n");
+  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU Singular Ready Image Inference >>>\n\n");
   
   if (!has_zicntr) {
     neorv32_uart0_printf("[WARNING] Zicntr hardware counters DISABLED. Timing skipped.\n");
@@ -95,12 +105,12 @@ int main(void) {
   /* 3. Load the 784 pixels into the CFS image buffer. */
   neorv32_uart0_printf("Loading %u pixels into the image buffer.\n", PIXEL_COUNT);
   
-  MEASURE_TIME_US("Pixel load", {
+  GET_TIME_US("Pixel load", {
   neorv32_cfs_load_image(pixel_array, PIXEL_COUNT);
   });
 
   status_value = neorv32_cfs_read_reg(CFS_REG_STATUS);
-  neorv32_uart0_printf("Status after load: 0x%x\n", status_value);
+  neorv32_uart0_printf("Frame loaded flag: %u\n", (status_value && CFS_STATUS_FRAME_LOADED_BIT));
 
   if ((status_value & CFS_STATUS_FRAME_LOADED_BIT) == 0u) {
     neorv32_uart0_printf("[ERROR] Image was not marked as loaded.\n");
@@ -108,13 +118,14 @@ int main(void) {
   }
 
   /* 4. Start inference and wait for completion via interrupt. */
-  MEASURE_TIME_US("Inference", {
+  neorv32_uart0_printf("\nStarting Inference...\n");
+  GET_TIME_US("Inference", {
   neorv32_cfs_start_inference();
   status_value = neorv32_cfs_wait_for_result_irq(&prediction);
   });
 
-  neorv32_uart0_printf("Inference complete. Status=0x%x Prediction=%u Time-taken=%uus\n",
-                       status_value, prediction, inf_t_us);
+  neorv32_uart0_printf("\nInference complete. Done flag = %u Prediction = %u\n",
+                       (status_value && CFS_STATUS_BUSY_BIT), prediction);
 
   neorv32_cfs_irq_disable();
 

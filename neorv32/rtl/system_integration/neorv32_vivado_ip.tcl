@@ -20,6 +20,7 @@ set script_dir [file dirname $script_path]
 set neorv32_home $script_dir/../..
 # Ale: Updated logo
 set ip_logo $neorv32_home/docs/figures/neorv32_tinytpu_logo.png
+# /Ale
 set outputdir $script_dir/neorv32_vivado_ip_work
 set ip_top neorv32_vivado_ip
 

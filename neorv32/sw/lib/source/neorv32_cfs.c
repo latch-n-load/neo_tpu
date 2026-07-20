@@ -84,8 +84,7 @@ void neorv32_cfs_irq_enable(void) {
 
 void neorv32_cfs_irq_disable(void) {
   neorv32_cpu_csr_clr(CSR_MIE, (1u << CFS_FIRQ_ENABLE));
-  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS interrupt disabled.\n");
-
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS interrupt disabled.\n");
 }
 
 void neorv32_cfs_irq_handler(void) {
@@ -97,7 +96,7 @@ void neorv32_cfs_irq_handler(void) {
 
 void neorv32_cfs_start_inference(void) {
   neorv32_cfs_write_reg(CFS_REG_CONTROL, CFS_CTRL_START_BIT);
-  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Start sent to TPU.\n");
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Start sent to TPU.\n");
 }
 
 // Pointers: Takes a read-only ("const") pointer to an array of 8-bit bytes (pixels), and the total count.
@@ -143,11 +142,11 @@ uint32_t neorv32_cfs_busy_wait_result(uint32_t *prediction) {
   while ((neorv32_cfs_read_reg(CFS_REG_STATUS) & CFS_STATUS_DONE_BIT) == 0u) {
     /* busy wait until the classifier completes */
   }
-  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Busy-wait done. Read @ %s, value: %x\n", cfs_reg_names[CFS_REG_STATUS], neorv32_cfs_read_reg(CFS_REG_STATUS));  
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] Busy-wait done. Read @ %s, value: %x\n", cfs_reg_names[CFS_REG_STATUS], neorv32_cfs_read_reg(CFS_REG_STATUS));  
 
   // Pointer Dereferencing: Follows the pointer to the original variable and overwrites it with the hardware's result.
   *prediction = neorv32_cfs_read_reg(CFS_REG_RESULT);
-  neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS prediction read @ %s, value: %x\n", cfs_reg_names[CFS_REG_RESULT], *prediction);
+  // neorv32_uart0_printf("[DEBUG neorv32_cfs.c] CFS prediction read @ %s, value: %x\n", cfs_reg_names[CFS_REG_RESULT], *prediction);
 
   // Returns the final state of the hardware STATUS register to the main program.
   return neorv32_cfs_read_reg(CFS_REG_STATUS);
