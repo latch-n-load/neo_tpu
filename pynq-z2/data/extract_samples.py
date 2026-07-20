@@ -1,4 +1,5 @@
 import struct
+import shutil
 import numpy as np
 from pathlib import Path
 from PIL import Image, ImageDraw
@@ -18,6 +19,13 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
     images_path = Path(images_path)
     labels_path = Path(labels_path)
     out_dir = Path(output_dir)
+
+    # Completely remove the directory and its contents if it exists
+    if out_dir.exists() and out_dir.is_dir():
+        print(f"[*] Removing stale directory: {out_dir}")
+        shutil.rmtree(out_dir)
+        
+    # Create a fresh directory
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Parse and Slice Labels
@@ -64,12 +72,13 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
     print(f"  [+] Unified label memh saved to:   {memh_lbl_file}")
 
     # 5. Export Unified COE File for Vivado BRAM (.coe)
-    # Packs four 8-bit pixels into 32-bit words, LSB first.
-    coe_img_file = out_dir / f"all_{num_samples}_images.coe"
-    flat_pixels = images.ravel()
-    
-    # 784 pixels per image is perfectly divisible by 4, so no padding is required
+    # Packs four 8-bit pixels/labels into 32-bit words, LSB first.
+    coe_data_file = out_dir / f"all_{num_samples}_data.coe"
     words_32bit = []
+    
+    # 5a. Pack Images
+    flat_pixels = images.ravel()
+    # 784 pixels per image is perfectly divisible by 4, so no padding is required
     for i in range(0, len(flat_pixels), 4):
         p0 = flat_pixels[i]
         p1 = flat_pixels[i+1]
@@ -80,13 +89,32 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
         word = (p3 << 24) | (p2 << 16) | (p1 << 8) | p0
         words_32bit.append(f"{word:08X}")
 
-    with open(coe_img_file, 'w', encoding="ascii") as f:
+    # 5b. Pack Labels
+    flat_labels = labels.ravel()
+    remainder = len(flat_labels) % 4
+    if remainder != 0:
+        # Pad with zeros to ensure the final elements complete a 32-bit word
+        padding = np.zeros(4 - remainder, dtype=np.uint8)
+        flat_labels = np.concatenate((flat_labels, padding))
+
+    for i in range(0, len(flat_labels), 4):
+        l0 = flat_labels[i]
+        l1 = flat_labels[i+1]
+        l2 = flat_labels[i+2]
+        l3 = flat_labels[i+3]
+        
+        # Pack LSB first
+        word = (l3 << 24) | (l2 << 16) | (l1 << 8) | l0
+        words_32bit.append(f"{word:08X}")
+
+    # 5c. Write to file
+    with open(coe_data_file, 'w', encoding="ascii") as f:
         f.write("memory_initialization_radix=16;\n")
         f.write("memory_initialization_vector=\n")
         f.write(",\n".join(words_32bit))
         f.write(";\n") # Vivado requires the final entry to end with a semicolon
         
-    print(f"  [+] Unified image COE saved to:    {coe_img_file}")
+    print(f"  [+] Unified data COE saved to:     {coe_data_file}")
 
     print("\n[*] Generating visual JPEG renders...")
     
