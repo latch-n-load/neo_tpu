@@ -48,6 +48,10 @@ enum {
 #define CFS_CTRL_CLEAR_ERR_BIT     (1u << 3)
 #define CFS_CTRL_CLEAR_IRQ_BIT     (1u << 4)
 
+/* Image packing constants */
+#define CFS_IMAGE_BYTE_COUNT       (98u)
+#define CFS_IMAGE_BIT_THRESHOLD    (127u)
+
 /* Status register bits */
 #define CFS_STATUS_BUSY_BIT        (1u << 0)
 #define CFS_STATUS_DONE_BIT        (1u << 1)

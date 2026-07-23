@@ -9,7 +9,7 @@
 #include <neorv32.h>
 #include "neorv32_cfs.h"
 
-#define EN_TIME // Macro for getting timing results
+#define EN_TIME // Macro for obtaining timing results
 
 #define BAUD_RATE 19200u
 #define PIXEL_COUNT 784u

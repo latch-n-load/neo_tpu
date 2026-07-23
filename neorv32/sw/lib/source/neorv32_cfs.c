@@ -156,7 +156,6 @@ uint32_t neorv32_cfs_wait_for_result_irq(uint32_t *prediction) {
   neorv32_cfs_irq_pending = 0u;
 
   while (neorv32_cfs_irq_pending == 0u) {
-    neorv32_uart0_printf("[DEBUG neorv32_cfs.c] NEORV32 Going to sleep, WFI from TPU...\n");
     neorv32_cpu_sleep();
   }
 
