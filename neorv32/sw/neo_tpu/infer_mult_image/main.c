@@ -41,7 +41,7 @@ static void dma_wait_for_done(void) {
 static void dma_start_transfer(uint32_t src_addr, uint32_t *dst_words, uint32_t word_count) {
   uint32_t config = DMA_SRC_INC_WORD | DMA_DST_INC_WORD | word_count;
   dma_irq_pending = 0u;
-  neorv32_uart0_printf("[DEBUG] Starting DMA Transfer with DMA_SRC_INC_WORD and DMA_DST_INC_WORD\n");
+  // neorv32_uart0_printf("[DEBUG] Starting DMA Transfer with DMA_SRC_INC_WORD and DMA_DST_INC_WORD\n");
   neorv32_dma_program(src_addr, (uint32_t)dst_words, config);
   neorv32_dma_start();
 }
@@ -74,7 +74,7 @@ static void unpack_labels(const uint32_t *src_words, uint8_t *dst_labels) {
     uint32_t word_idx = i / 4u;
     uint32_t byte_idx = i % 4u;
     dst_labels[i] = (uint8_t)((src_words[word_idx] >> (8u * byte_idx)) & 0xffu);
-    neorv32_uart0_printf("true_labels[%u] = %u\n", i, dst_labels[i]);
+    // neorv32_uart0_printf("[DEBUG] true_labels[%u] = %u\n", i, dst_labels[i]);
   }
 }
 
@@ -139,15 +139,15 @@ int main(void) {
   }
 
   neorv32_uart0_printf("Loading labels from external memory.\n");
-  neorv32_uart0_printf("LABEL_BASE_ADDR 0x%x, label_dma_buf 0x%x, LABEL_WORD_COUNT %u.\n", 
-    LABEL_BASE_ADDR, (uint32_t)&label_dma_buf, LABEL_WORD_COUNT);
+  // neorv32_uart0_printf("[DEBUG] LABEL_BASE_ADDR 0x%x, label_dma_buf 0x%x, LABEL_WORD_COUNT %u.\n", 
+    // LABEL_BASE_ADDR, (uint32_t)&label_dma_buf, LABEL_WORD_COUNT);
   dma_start_transfer(LABEL_BASE_ADDR, label_dma_buf, LABEL_WORD_COUNT);
   dma_wait_for_done();
 
-  neorv32_uart0_printf("LABELS:\n label_dma_buf[0] 0x%x, \n label_dma_buf[1] 0x%x\n",
-    label_dma_buf[0], label_dma_buf[1] );
-  neorv32_uart0_printf("Unpack LABELS: label_dma_buf 0x%x, true_labels 0x%x\n",
-    (uint32_t)&label_dma_buf, (uint32_t)&true_labels);
+  // neorv32_uart0_printf("[DEBUG] LABELS:\n label_dma_buf[0] 0x%x, \n label_dma_buf[1] 0x%x\n",
+    // label_dma_buf[0], label_dma_buf[1] );
+  // neorv32_uart0_printf("[DEBUG] Unpack LABELS: label_dma_buf 0x%x, true_labels 0x%x\n",
+    // (uint32_t)&label_dma_buf, (uint32_t)&true_labels);
   unpack_labels(label_dma_buf, true_labels);
 
   neorv32_uart0_printf("Clearing frame and flags before inference.\n");
@@ -159,9 +159,9 @@ int main(void) {
     uint32_t *active_buffer = (img_idx & 1u) ? pixel_dma_buf_1 : pixel_dma_buf_0;
     uint32_t *preload_buffer = (img_idx & 1u) ? pixel_dma_buf_0 : pixel_dma_buf_1;
     uint32_t image_src_addr = EXT_MEM_BASE + (img_idx * IMAGE_STRIDE_WORDS * 4u);
-    // uint32_t image_src_addr = EXT_MEM_BASE + (img_idx * IMAGE_STRIDE_WORDS);
 
-    neorv32_uart0_printf("Image %u: DMA from [0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
+    neorv32_uart0_printf("Loading Image %u: DMA from MEM[0x%x]...\n", img_idx, image_src_addr);
+    // neorv32_uart0_printf("[DEBUG] Image %u: DMA from MEM[0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
     dma_start_transfer(image_src_addr, active_buffer, PIXEL_WORD_COUNT);
     dma_wait_for_done();
 
@@ -191,8 +191,8 @@ int main(void) {
     //   dma_wait_for_done();
     // }
 
-    neorv32_uart0_printf("[DEBUG] Comparing Prediction with true_lables @ [0x%x]\n", (uint32_t)&true_labels[img_idx]);
-    neorv32_uart0_printf("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
+    // neorv32_uart0_printf("[DEBUG] Comparing Prediction with true_lables @ [0x%x]\n", (uint32_t)&true_labels[img_idx]);
+    neorv32_uart0_printf("Image %u:\n\t Prediction=%u, Label=%u, Status=0x%x\n",
                          img_idx, prediction, true_labels[img_idx], status_value);
     if (prediction != true_labels[img_idx]) {
       neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n", img_idx);
