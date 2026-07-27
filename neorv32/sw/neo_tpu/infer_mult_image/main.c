@@ -160,7 +160,7 @@ int main(void) {
     uint32_t *preload_buffer = (img_idx & 1u) ? pixel_dma_buf_0 : pixel_dma_buf_1;
     uint32_t image_src_addr = EXT_MEM_BASE + (img_idx * IMAGE_STRIDE_WORDS * 4u);
 
-    neorv32_uart0_printf("Loading Image %u: DMA from MEM[0x%x]...\n", img_idx, image_src_addr);
+    neorv32_uart0_printf("Loading Image %u: DMA from EXT_MEM[0x%x].\n", img_idx, image_src_addr);
     // neorv32_uart0_printf("[DEBUG] Image %u: DMA from MEM[0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
     dma_start_transfer(image_src_addr, active_buffer, PIXEL_WORD_COUNT);
     dma_wait_for_done();
@@ -192,11 +192,13 @@ int main(void) {
     // }
 
     // neorv32_uart0_printf("[DEBUG] Comparing Prediction with true_lables @ [0x%x]\n", (uint32_t)&true_labels[img_idx]);
-    neorv32_uart0_printf("Image %u:\n\t Prediction=%u, Label=%u, Status=0x%x\n",
+    neorv32_uart0_printf("Image %u: Inference Complete.\n"); 
+    neorv32_uart0_printf("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
                          img_idx, prediction, true_labels[img_idx], status_value);
     if (prediction != true_labels[img_idx]) {
       neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n", img_idx);
     }
+    else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n");
   }
 
   neorv32_cfs_irq_disable();
