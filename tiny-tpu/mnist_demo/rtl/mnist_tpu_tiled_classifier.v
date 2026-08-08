@@ -469,3 +469,5 @@ module mnist_tpu_tiled_classifier #(
         end
     end
 endmodule
+
+`default_nettype wire

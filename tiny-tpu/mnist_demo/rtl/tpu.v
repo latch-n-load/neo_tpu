@@ -184,3 +184,5 @@ module tpu #(
         .vpu_valid_out_2(vpu_valid_out_2)
     );
 endmodule
+
+`default_nettype wire

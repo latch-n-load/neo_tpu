@@ -38,3 +38,5 @@ module mnist_frame_buffer #(
         end
     end
 endmodule
+
+`default_nettype wire

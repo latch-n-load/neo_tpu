@@ -98,3 +98,5 @@ module uart_rx #(
         end
     end
 endmodule
+
+`default_nettype wire

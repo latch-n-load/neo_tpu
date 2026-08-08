@@ -97,3 +97,5 @@ module fxp_addsub #(
                  result[WOI+WOF-1:0];
 
 endmodule
+
+`default_nettype wire

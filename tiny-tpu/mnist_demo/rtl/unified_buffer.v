@@ -659,3 +659,5 @@ module unified_buffer #(
     end
 
 endmodule
+
+`default_nettype wire

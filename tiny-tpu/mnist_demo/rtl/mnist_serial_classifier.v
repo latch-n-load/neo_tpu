@@ -74,3 +74,5 @@ module mnist_serial_classifier #(
         .prediction_out(prediction_out)
     );
 endmodule
+
+`default_nettype wire

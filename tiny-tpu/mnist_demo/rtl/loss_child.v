@@ -51,4 +51,4 @@ module loss_child (
 
 endmodule
 
-
+`default_nettype wire

@@ -33,7 +33,7 @@ USER_FLAGS += -Wl,--defsym,__neorv32_ram_size=8k
 #APP_INC += -I .
 
 # Ale
-USER_FLAGS += -DUART0_SIM_MODE
+# USER_FLAGS += -DUART0_SIM_MODE
 
 # GHDL not used, simulation is in modelsim
 # GHDL_RUN_FLAGS += --wave=neo_tpu.ghw 

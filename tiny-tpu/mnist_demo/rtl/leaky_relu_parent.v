@@ -40,3 +40,5 @@ module leaky_relu_parent (
     );
 
 endmodule
+
+`default_nettype wire

@@ -11,7 +11,7 @@
 #include "neorv32_dma.h"
 
 // #define EN_TIME  // Macro for obtaining timing results
-#define BAUD_RATE 19200u
+#define BAUD_RATE 19200u // Make sure to set on monitor
 #define PIXEL_COUNT 784u
 #define PIXEL_ENTRY_COUNT CFS_IMAGE_BYTE_COUNT
 #define PIXEL_WORD_COUNT ((PIXEL_COUNT + 3u) / 4u) // Round up to closest word
@@ -104,13 +104,12 @@ int main(void) {
   uint32_t version_value = 0u;
   uint32_t status_value = 0u;
   uint32_t prediction = 0u;
-  uint32_t next_src_addr = 0u;
-  uint32_t *next_buffer = pixel_dma_buf_0;
 
   neorv32_rte_setup();
   neorv32_uart0_setup(BAUD_RATE, 0);
   neorv32_rte_handler_install(DMA_TRAP_CODE, dma_firq_handler);
   neorv32_cfs_irq_enable();
+  neorv32_gpio_pin_set(0, 0);
   neorv32_dma_enable();
   neorv32_cpu_csr_set(CSR_MIE, (1u << CFS_FIRQ_ENABLE) | (1u << DMA_FIRQ_ENABLE));
   neorv32_cpu_csr_set(CSR_MSTATUS, (1u << CSR_MSTATUS_MIE));
@@ -157,26 +156,15 @@ int main(void) {
 
   for (uint32_t img_idx = 0u; img_idx < IMAGE_COUNT; ++img_idx) {
     uint32_t *active_buffer = (img_idx & 1u) ? pixel_dma_buf_1 : pixel_dma_buf_0;
-    uint32_t *preload_buffer = (img_idx & 1u) ? pixel_dma_buf_0 : pixel_dma_buf_1;
     uint32_t image_src_addr = EXT_MEM_BASE + (img_idx * IMAGE_STRIDE_WORDS * 4u);
 
-    neorv32_uart0_printf("Image %u: Loading %u Pixels via DMA from EXT_MEM[0x%x].\n", PIXEL_COUNT, img_idx, image_src_addr);
+    neorv32_uart0_printf("Image %u: Loading %u Pixels via DMA from EXT_MEM[0x%x].\n", img_idx, PIXEL_COUNT, image_src_addr);
     // neorv32_uart0_printf("[DEBUG] Image %u: DMA from MEM[0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
     dma_start_transfer(image_src_addr, active_buffer, PIXEL_WORD_COUNT);
     dma_wait_for_done();
 
     unpack_pixels_to_bits(active_buffer, pixel_bits);
     neorv32_uart0_printf("Image %u: unpacked and thresholded.\n", img_idx);
-
-    // if ((img_idx + 1u) < IMAGE_COUNT) {
-    //   next_src_addr = EXT_MEM_BASE + ((img_idx + 1u) * IMAGE_STRIDE_WORDS * 4u);
-    //   // next_src_addr = EXT_MEM_BASE + ((img_idx + 1u) * IMAGE_STRIDE_WORDS);
-    //   next_buffer = preload_buffer;
-  
-    //   neorv32_uart0_printf("Image %u: preloading next image into ping-pong buffer.\n", img_idx + 1u);
-    //   neorv32_uart0_printf("DMA from [0x%x] %u, PIXEL_WORD_COUNT %u\n", next_src_addr, next_src_addr, PIXEL_WORD_COUNT);
-    //   dma_start_transfer(next_src_addr, next_buffer, PIXEL_WORD_COUNT);
-    // }
 
     neorv32_uart0_printf("Image %u: starting inference.\n", img_idx);
     neorv32_cfs_clear_frame();
@@ -187,10 +175,6 @@ int main(void) {
       status_value = neorv32_cfs_wait_for_result_irq(&prediction);
     });
 
-    // if ((img_idx + 1u) < IMAGE_COUNT) {
-    //   dma_wait_for_done();
-    // }
-
     // neorv32_uart0_printf("[DEBUG] Comparing Prediction with true_lables @ [0x%x]\n", (uint32_t)&true_labels[img_idx]);
     neorv32_uart0_printf("Image %u: Inference Complete.\n", img_idx); 
     neorv32_uart0_printf("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
@@ -198,7 +182,7 @@ int main(void) {
     if (prediction != true_labels[img_idx]) {
       neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n", img_idx);
     }
-    else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n");
+    else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n\n");
   }
 
   neorv32_cfs_irq_disable();

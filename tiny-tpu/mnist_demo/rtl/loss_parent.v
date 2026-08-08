@@ -46,3 +46,5 @@ loss_child second_column (
 
 
 endmodule
+
+`default_nettype wire

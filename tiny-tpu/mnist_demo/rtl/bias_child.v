@@ -38,3 +38,5 @@ module bias_child (
     end
 
 endmodule
+
+`default_nettype wire

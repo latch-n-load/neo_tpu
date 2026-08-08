@@ -144,3 +144,5 @@ module systolic #(
     end
 
 endmodule
+
+`default_nettype wire

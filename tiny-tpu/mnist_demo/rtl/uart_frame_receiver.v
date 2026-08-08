@@ -110,3 +110,5 @@ module uart_frame_receiver #(
         end
     end
 endmodule
+
+`default_nettype wire

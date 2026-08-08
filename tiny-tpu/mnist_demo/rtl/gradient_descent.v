@@ -77,3 +77,5 @@ module gradient_descent (
 
 
 endmodule
+
+`default_nettype wire

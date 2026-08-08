@@ -111,6 +111,7 @@ int main(void) {
   neorv32_uart0_setup(BAUD_RATE, 0);
   neorv32_rte_handler_install(DMA_TRAP_CODE, dma_firq_handler);
   neorv32_cfs_irq_enable();
+  neorv32_gpio_pin_set(0, 0);
   neorv32_dma_enable();
   neorv32_cpu_csr_set(CSR_MIE, (1u << CFS_FIRQ_ENABLE) | (1u << DMA_FIRQ_ENABLE));
   neorv32_cpu_csr_set(CSR_MSTATUS, (1u << CSR_MSTATUS_MIE));
@@ -160,7 +161,7 @@ int main(void) {
     uint32_t *preload_buffer = (img_idx & 1u) ? pixel_dma_buf_0 : pixel_dma_buf_1;
     uint32_t image_src_addr = EXT_MEM_BASE + (img_idx * IMAGE_STRIDE_WORDS * 4u);
 
-    neorv32_uart0_printf("Image %u: Loading %u Pixels via DMA from EXT_MEM[0x%x].\n", PIXEL_COUNT, img_idx, image_src_addr);
+    neorv32_uart0_printf("Image %u: Loading %u Pixels via DMA from EXT_MEM[0x%x].\n", img_idx, PIXEL_COUNT, image_src_addr);
     // neorv32_uart0_printf("[DEBUG] Image %u: DMA from MEM[0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
     dma_start_transfer(image_src_addr, active_buffer, PIXEL_WORD_COUNT);
     dma_wait_for_done();
@@ -198,7 +199,7 @@ int main(void) {
     if (prediction != true_labels[img_idx]) {
       neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n", img_idx);
     }
-    else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n");
+    else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n\n");
   }
 
   neorv32_cfs_irq_disable();

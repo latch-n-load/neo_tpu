@@ -45,3 +45,5 @@ module bias_parent(
 
 
 endmodule
+
+`default_nettype wire

@@ -69,3 +69,5 @@ module control_unit (
     assign vpu_leak_factor_in = instruction[87:72];
 
 endmodule
+
+`default_nettype wire

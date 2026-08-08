@@ -859,3 +859,5 @@ module mnist_classifier_core #(
         end
     end
 endmodule
+
+`default_nettype wire

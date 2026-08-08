@@ -49,3 +49,5 @@ module mnist_uart_ingress #(
         .frame_loaded_out(frame_loaded_out)
     );
 endmodule
+
+`default_nettype wire

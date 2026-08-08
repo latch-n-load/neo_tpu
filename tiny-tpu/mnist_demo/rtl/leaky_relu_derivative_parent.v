@@ -45,3 +45,5 @@ module leaky_relu_derivative_parent (
     );
 
 endmodule
+
+`default_nettype wire

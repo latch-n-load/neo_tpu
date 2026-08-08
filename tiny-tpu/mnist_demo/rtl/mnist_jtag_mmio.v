@@ -150,3 +150,5 @@ module mnist_jtag_mmio #(
         end
     end
 endmodule
+
+`default_nettype wire
