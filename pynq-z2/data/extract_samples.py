@@ -4,17 +4,18 @@ import numpy as np
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-NUM_SAMPLES = 5
+# You can now set this anywhere between 1 and 10000
+NUM_SAMPLES = 100
 
 def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, num_samples: int):
     """
-    Extracts a variable number of samples (2-10) from MNIST IDX files.
-    Generates unified .bin, .memh, and .coe files for DMA/BRAM loading, 
-    and individual labeled JPEGs for visual verification.
+    Extracts a variable number of samples (1-10000) from MNIST IDX files.
+    Generates unified .memh, and .coe files for DMA/BRAM loading, 
+    and individual labeled JPEGs (capped at 5) for visual verification.
     """
-    # Defensive check for your requirements
-    if not (2 <= num_samples <= 10):
-        raise ValueError("This script is configured to extract between 2 and 10 images.")
+    # 1. Update defensive check for 1 to 10,000 range
+    if not (1 <= num_samples <= 10000):
+        raise ValueError("This script is configured to extract between 1 and 10,000 images.")
 
     images_path = Path(images_path)
     labels_path = Path(labels_path)
@@ -47,17 +48,9 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
     print(f"[*] Processing {num_samples} samples...")
 
-    # 3. Export Unified Binary Files (.bin)
-    # Writes the entire multi-image/multi-label arrays to single files.
-    bin_img_file = out_dir / f"all_{num_samples}_images.bin"
-    bin_lbl_file = out_dir / f"all_{num_samples}_labels.bin"
-    
-    images.tofile(bin_img_file)
-    labels.tofile(bin_lbl_file)
-    print(f"  [+] Unified image binary saved to: {bin_img_file}")
-    print(f"  [+] Unified label binary saved to: {bin_lbl_file}")
+    # [REMOVED] Binary (.bin) file generation deleted as requested.
 
-    # 4. Export Unified Hex Files (.memh)
+    # 3. Export Unified Hex Files (.memh)
     # Formats each 8-bit value sequentially (00 to FF) into a single master file.
     memh_img_file = out_dir / f"all_{num_samples}_images.memh"
     memh_lbl_file = out_dir / f"all_{num_samples}_labels.memh"
@@ -71,12 +64,12 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
     print(f"  [+] Unified image memh saved to:   {memh_img_file}")
     print(f"  [+] Unified label memh saved to:   {memh_lbl_file}")
 
-    # 5. Export Unified COE File for Vivado BRAM (.coe)
+    # 4. Export Unified COE File for Vivado BRAM (.coe)
     # Packs four 8-bit pixels/labels into 32-bit words, LSB first.
     coe_data_file = out_dir / f"all_{num_samples}_data.coe"
     words_32bit = []
     
-    # 5a. Pack Images
+    # 4a. Pack Images
     flat_pixels = images.ravel()
     # 784 pixels per image is perfectly divisible by 4, so no padding is required
     for i in range(0, len(flat_pixels), 4):
@@ -89,7 +82,7 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
         word = (p3 << 24) | (p2 << 16) | (p1 << 8) | p0
         words_32bit.append(f"{word:08X}")
 
-    # 5b. Pack Labels
+    # 4b. Pack Labels
     flat_labels = labels.ravel()
     remainder = len(flat_labels) % 4
     if remainder != 0:
@@ -107,7 +100,7 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
         word = (l3 << 24) | (l2 << 16) | (l1 << 8) | l0
         words_32bit.append(f"{word:08X}")
 
-    # 5c. Write to file
+    # 4c. Write to file
     with open(coe_data_file, 'w', encoding="ascii") as f:
         f.write("memory_initialization_radix=16;\n")
         f.write("memory_initialization_vector=\n")
@@ -118,8 +111,10 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
     print("\n[*] Generating visual JPEG renders...")
     
-    # 6. Export Individual Visual Assets (JPEGs)
-    for i in range(num_samples):
+    # 5. Export Individual Visual Assets (JPEGs) - CAPPED AT 5
+    num_jpegs = min(num_samples, 5)
+    
+    for i in range(num_jpegs):
         img_matrix = images[i]
         label = labels[i]
         
@@ -145,6 +140,10 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
         pil_img_large.save(jpg_file)
 
         print(f"  [+] Generated JPEG: {jpg_file.name}")
+        
+    # Inform the user if some images were skipped for rendering
+    if num_samples > 5:
+        print(f"  [!] Skipped generating JPEGs for the remaining {num_samples - 5} images (capped at 5).")
 
     print(f"\n[SUCCESS] Check the '{output_dir}' directory for your assets.")
 
@@ -152,7 +151,7 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 if __name__ == "__main__":
     # Adjust paths if your files are named differently
     MNIST_IMAGES = "t10k-images.idx3-ubyte"
-    MNIST_LABELS = "t10k-labels.idx1-ubyte"
+    MNIST_LABELS = "t10k-labels.idx1-ubyte" # Note: make sure this matches your dataset filename!
     OUTPUT_FOLDER = "extracted_samples"
     
     # Execute the extraction
