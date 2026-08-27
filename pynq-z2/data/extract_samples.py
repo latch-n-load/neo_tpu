@@ -52,8 +52,8 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
     # 3. Export Unified Hex Files (.memh)
     # Formats each 8-bit value sequentially (00 to FF) into a single master file.
-    memh_img_file = out_dir / f"all_{num_samples}_images.memh"
-    memh_lbl_file = out_dir / f"all_{num_samples}_labels.memh"
+    memh_img_file = out_dir / f"images_hex.memh"
+    memh_lbl_file = out_dir / f"labels_hex.memh"
     
     hex_images = [f"{pixel:02X}" for pixel in images.ravel()]
     memh_img_file.write_text("\n".join(hex_images) + "\n", encoding="ascii")
@@ -66,7 +66,7 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
     # 4. Export Unified COE File for Vivado BRAM (.coe)
     # Packs four 8-bit pixels/labels into 32-bit words, LSB first.
-    coe_data_file = out_dir / f"all_{num_samples}_data.coe"
+    coe_data_file = out_dir / f"images_labels_bram.coe"
     words_32bit = []
     
     # 4a. Pack Images
