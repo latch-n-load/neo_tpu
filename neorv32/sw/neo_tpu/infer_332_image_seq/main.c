@@ -11,14 +11,14 @@
 #include "neorv32_dma.h"
 
 // #define EN_TIME  // Macro for obtaining timing results
-#define BAUD_RATE 19200u // Make sure to set on monitor
+#define BAUD_RATE 19200u
 #define PIXEL_COUNT 784u
 #define PIXEL_ENTRY_COUNT CFS_IMAGE_BYTE_COUNT
 #define PIXEL_WORD_COUNT ((PIXEL_COUNT + 3u) / 4u) // Round up to closest word
-#define IMAGE_COUNT 5u
+#define IMAGE_COUNT 100u
 #define EXT_MEM_BASE 0xC0000000u
 #define IMAGE_STRIDE_WORDS PIXEL_WORD_COUNT
-#define LABEL_WORD_COUNT 2u
+#define LABEL_WORD_COUNT ((IMAGE_COUNT + 3u) / 4u)
 #define LABEL_BASE_ADDR (EXT_MEM_BASE + (IMAGE_COUNT * IMAGE_STRIDE_WORDS * 4u))
 #define PIXEL_THRESHOLD 127u
 
@@ -101,9 +101,11 @@ int main(void) {
   uint32_t pixel_dma_buf_1[PIXEL_WORD_COUNT];
   uint32_t label_dma_buf[LABEL_WORD_COUNT] = {0};
   uint8_t true_labels[IMAGE_COUNT] = {0};
+  uint8_t predictions[IMAGE_COUNT] = {0};
   uint32_t version_value = 0u;
   uint32_t status_value = 0u;
   uint32_t prediction = 0u;
+  uint16_t err_cnt = 0u;
 
   neorv32_rte_setup();
   neorv32_uart0_setup(BAUD_RATE, 0);
@@ -144,9 +146,9 @@ int main(void) {
   dma_wait_for_done();
 
   // neorv32_uart0_printf("[DEBUG] LABELS:\n label_dma_buf[0] 0x%x, \n label_dma_buf[1] 0x%x\n",
-    // label_dma_buf[0], label_dma_buf[1] );
+  //   label_dma_buf[0], label_dma_buf[1] );
   // neorv32_uart0_printf("[DEBUG] Unpack LABELS: label_dma_buf 0x%x, true_labels 0x%x\n",
-    // (uint32_t)&label_dma_buf, (uint32_t)&true_labels);
+  //   (uint32_t)&label_dma_buf, (uint32_t)&true_labels);
   unpack_labels(label_dma_buf, true_labels);
 
   neorv32_uart0_printf("Clearing frame and flags before inference.\n");
@@ -166,6 +168,16 @@ int main(void) {
     unpack_pixels_to_bits(active_buffer, pixel_bits);
     neorv32_uart0_printf("Image %u: unpacked and thresholded.\n", img_idx);
 
+    // if ((img_idx + 1u) < IMAGE_COUNT) {
+    //   next_src_addr = EXT_MEM_BASE + ((img_idx + 1u) * IMAGE_STRIDE_WORDS * 4u);
+    //   // next_src_addr = EXT_MEM_BASE + ((img_idx + 1u) * IMAGE_STRIDE_WORDS);
+    //   next_buffer = preload_buffer;
+  
+    //   neorv32_uart0_printf("Image %u: preloading next image into ping-pong buffer.\n", img_idx + 1u);
+    //   neorv32_uart0_printf("DMA from [0x%x] %u, PIXEL_WORD_COUNT %u\n", next_src_addr, next_src_addr, PIXEL_WORD_COUNT);
+    //   dma_start_transfer(next_src_addr, next_buffer, PIXEL_WORD_COUNT);
+    // }
+
     neorv32_uart0_printf("Image %u: starting inference.\n", img_idx);
     neorv32_cfs_clear_frame();
     neorv32_cfs_load_image(pixel_bits, PIXEL_COUNT);
@@ -175,15 +187,61 @@ int main(void) {
       status_value = neorv32_cfs_wait_for_result_irq(&prediction);
     });
 
+    predictions[img_idx] = (uint8_t)prediction;
+
+
+    // if ((img_idx + 1u) < IMAGE_COUNT) {
+    //   dma_wait_for_done();
+    // }
+
     // neorv32_uart0_printf("[DEBUG] Comparing Prediction with true_lables @ [0x%x]\n", (uint32_t)&true_labels[img_idx]);
     neorv32_uart0_printf("Image %u: Inference Complete.\n", img_idx); 
     neorv32_uart0_printf("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
                          img_idx, prediction, true_labels[img_idx], status_value);
     if (prediction != true_labels[img_idx]) {
-      neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n", img_idx);
+      neorv32_uart0_printf("[ERROR] Mismatch for image %u.\n\n", img_idx);
+      err_cnt++;
     }
     else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n\n");
   }
+
+  /* -------------------------------------------------------------
+   * Evaluation & Accuracy Metrics Summary
+   * ------------------------------------------------------------- */
+  uint32_t crct_cnt = IMAGE_COUNT - err_cnt;
+
+  // Fixed-point calculation (scaling by 10000 gives 2 decimal places: 9540 = 95.40%)
+  uint32_t acc_scaled = (crct_cnt * 10000u) / IMAGE_COUNT;
+  uint32_t acc_int = acc_scaled / 100u;
+  uint32_t acc_frac = acc_scaled % 100u;
+
+  uint32_t err_scaled = (err_cnt * 10000u) / IMAGE_COUNT;
+  uint32_t err_int = err_scaled / 100u;
+  uint32_t err_frac = err_scaled % 100u;
+
+  neorv32_uart0_printf("\n=======================================================\n");
+  neorv32_uart0_printf("             MNIST TPU EVALUATION REPORT               \n");
+  neorv32_uart0_printf("=======================================================\n");
+  neorv32_uart0_printf("Total Images Evaluated  : %u\n", IMAGE_COUNT);
+  neorv32_uart0_printf("Correct Classifications : %u\n", crct_cnt);
+  neorv32_uart0_printf("Misclassifications      : %u\n", err_cnt);
+  neorv32_uart0_printf("Top-1 Accuracy          : %u.%u%u%%\n", acc_int, acc_frac / 10u, acc_frac % 10u);
+  neorv32_uart0_printf("Error Rate (1 - Acc)    : %u.%u%u%%\n", err_int, err_frac / 10u, err_frac % 10u);
+  neorv32_uart0_printf("-------------------------------------------------------\n");
+
+  if (err_cnt > 0u) {
+    neorv32_uart0_printf("Misclassified Samples Details:\n");
+    neorv32_uart0_printf("  Image Index | Predicted | True Label\n");
+    neorv32_uart0_printf("  ------------+-----------+-----------\n");
+    for (uint32_t i = 0u; i < IMAGE_COUNT; ++i) {
+      if (predictions[i] != true_labels[i]) {
+        neorv32_uart0_printf("      %u       |     %u     |     %u\n", i, predictions[i], true_labels[i]);
+      }
+    }
+  } else {
+    neorv32_uart0_printf("Perfect Classification! 0 errors encountered.\n");
+  }
+  neorv32_uart0_printf("=======================================================\n\n");
 
   neorv32_cfs_irq_disable();
   neorv32_gpio_pin_set(0, 1);
