@@ -1,21 +1,21 @@
 import struct
 import shutil
+import argparse
 import numpy as np
 from pathlib import Path
 from PIL import Image, ImageDraw
 
-# You can now set this anywhere between 1 and 10000
-NUM_SAMPLES = 100
-
-def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, num_samples: int):
+def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, num_samples: int, base_index: int, custom_offsets: list):
     """
-    Extracts a variable number of samples (1-10000) from MNIST IDX files.
-    Generates unified .memh, and .coe files for DMA/BRAM loading, 
-    and individual labeled JPEGs (capped at 5) for visual verification.
+    Extracts a contiguous block of samples from MNIST IDX files starting from base_index.
+    Generates unified .memh, and .coe files for DMA/BRAM loading.
+    Renders the first 5 images and any valid user-specified custom offsets as JPEGs.
     """
-    # 1. Update defensive check for 1 to 10,000 range
+    # 1. Check constraints
     if not (1 <= num_samples <= 10000):
-        raise ValueError("This script is configured to extract between 1 and 10,000 images.")
+        raise ValueError("Number of samples to extract must be between 1 and 10,000.")
+    if base_index < 0:
+        raise ValueError("Base index cannot be negative.")
 
     images_path = Path(images_path)
     labels_path = Path(labels_path)
@@ -33,22 +33,25 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
     with open(labels_path, 'rb') as lbl_file:
         magic, total_labels = struct.unpack(">II", lbl_file.read(8))
         assert magic == 2049, "Invalid label magic number!"
-        # Read only the number of labels requested
+        if base_index + num_samples > total_labels:
+            raise ValueError(f"Requested extraction exceeds total labels ({total_labels}).")
+        
+        # Seek directly to the starting base index (Header is 8 bytes long)
+        lbl_file.seek(8 + base_index)
         labels = np.frombuffer(lbl_file.read(num_samples), dtype=np.uint8, count=num_samples)
 
-    # 2. Parse and Slice Grayscale Images
+    # 2. Parse and Slice Grayscale Images starting from base_index
     with open(images_path, 'rb') as img_file:
         magic, total_images, rows, cols = struct.unpack(">IIII", img_file.read(16))
         assert magic == 2051, "Invalid image magic number!"
         
-        # Read exactly the bytes needed for the requested number of images
+        # Seek directly to the starting base index (Header is 16 bytes long)
+        img_file.seek(16 + (base_index * rows * cols))
         bytes_to_read = num_samples * rows * cols
         images_raw = img_file.read(bytes_to_read)
         images = np.frombuffer(images_raw, dtype=np.uint8).reshape(num_samples, rows, cols)
 
-    print(f"[*] Processing {num_samples} samples...")
-
-    # [REMOVED] Binary (.bin) file generation deleted as requested.
+    print(f"[*] Extracting {num_samples} samples starting from absolute index {base_index}...")
 
     # 3. Export Unified Hex Files (.memh)
     # Formats each 8-bit value sequentially (00 to FF) into a single master file.
@@ -111,16 +114,28 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
     print("\n[*] Generating visual JPEG renders...")
     
-    # 5. Export Individual Visual Assets (JPEGs) - CAPPED AT 5
-    num_jpegs = min(num_samples, 5)
+    # 5. Determine which offsets to render
+    # Always include up to the first 5 images (offsets 0, 1, 2, 3, 4)
+    offsets_to_render = set(range(min(num_samples, 5)))
     
-    for i in range(num_jpegs):
-        img_matrix = images[i]
-        label = labels[i]
-        
-        base_name = f"sample_{i}_digit_{label}"
+    # Add any valid custom offsets provided by the user
+    for offset in custom_offsets:
+        if 0 <= offset < num_samples:
+            offsets_to_render.add(offset)
+        else:
+            print(f"  [!] Warning: Custom offset {offset} is out of bounds and will be ignored.")
 
-        # Convert 28x28 matrix to grayscale ('L') PIL image, then to RGB to handle red color text
+    # Sort the set so they render in numerical order
+    offsets_to_render = sorted(list(offsets_to_render))
+
+    # 6. Export Visual Assets (JPEGs)
+    for offset in offsets_to_render:
+        img_matrix = images[offset]
+        label = labels[offset]
+        absolute_index = base_index + offset
+        
+        base_name = f"offset_{offset}_absIdx_{absolute_index}_digit_{label}"
+
         pil_img = Image.fromarray(img_matrix, mode='L').convert('RGB')
         
         # Microscopic 28x28 canvases make text unreadable. We upscale to 280x280 
@@ -141,18 +156,39 @@ def extract_mnist_samples(images_path: str, labels_path: str, output_dir: str, n
 
         print(f"  [+] Generated JPEG: {jpg_file.name}")
         
-    # Inform the user if some images were skipped for rendering
-    if num_samples > 5:
-        print(f"  [!] Skipped generating JPEGs for the remaining {num_samples - 5} images (capped at 5).")
+    # Inform the user how many JPEGs were skipped
+    total_skipped = num_samples - len(offsets_to_render)
+    if total_skipped > 0:
+        print(f"  [!] Skipped generating JPEGs for the remaining {total_skipped} images.")
 
     print(f"\n[SUCCESS] Check the '{output_dir}' directory for your assets.")
 
 
 if __name__ == "__main__":
+    # Setup the argument parser for command line execution
+    parser = argparse.ArgumentParser(description="Extract a contiguous block of MNIST samples.")
+    
+    # Changed default from 5 to 100 as requested
+    parser.add_argument("--num-sample", type=int, default=100, 
+                        help="Number of samples to extract (1-10000). Default is 100.")
+    parser.add_argument("--base-id", type=int, default=0, 
+                        help="Starting absolute index in the dataset. Default is 0.")
+    parser.add_argument("--offset", type=int, nargs="*", default=[], 
+                        help="Additional custom offsets to render as JPEGs. E.g., --offsets 5 15 73")
+    
+    args = parser.parse_args()
+    
     # Adjust paths if your files are named differently
     MNIST_IMAGES = "t10k-images.idx3-ubyte"
     MNIST_LABELS = "t10k-labels.idx1-ubyte" # Note: make sure this matches your dataset filename!
     OUTPUT_FOLDER = "extracted_samples"
     
-    # Execute the extraction
-    extract_mnist_samples(MNIST_IMAGES, MNIST_LABELS, OUTPUT_FOLDER, num_samples=NUM_SAMPLES)
+    # Execute the extraction using the parsed command line arguments
+    extract_mnist_samples(
+        MNIST_IMAGES, 
+        MNIST_LABELS, 
+        OUTPUT_FOLDER, 
+        num_samples=args.num_sample, 
+        base_index=args.base_id, 
+        custom_offsets=args.offset
+    )
