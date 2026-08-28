@@ -22,7 +22,7 @@
 #define LABEL_BASE_ADDR (EXT_MEM_BASE + (IMAGE_COUNT * IMAGE_STRIDE_WORDS * 4u))
 #define PIXEL_THRESHOLD 127u
 
-static uint8_t has_zicntr = 0;
+// static uint8_t has_zicntr = 0;
 static uint32_t sys_freq = 0;
 volatile uint32_t dma_irq_pending = 0u;
 
@@ -34,7 +34,8 @@ void dma_firq_handler(void) {
 static void dma_wait_for_done(void) {
   dma_irq_pending = 0u;
   while (dma_irq_pending == 0u) {
-    neorv32_cpu_sleep();
+    /* busy wait */
+    // neorv32_cpu_sleep();
   }
 }
 
@@ -107,6 +108,14 @@ int main(void) {
   uint32_t prediction = 0u;
   uint16_t err_cnt = 0u;
 
+  // Timing Accumulators (Using 64-bit to prevent overflow)
+  uint64_t t_tick_start = 0;
+  uint64_t t_total_labels = 0;
+  uint64_t t_total_images = 0;
+  uint64_t t_total_tpu = 0;
+  uint64_t t_pipeline_start = 0;
+  uint64_t t_pipeline_end = 0;
+
   neorv32_rte_setup();
   neorv32_uart0_setup(BAUD_RATE, 0);
   neorv32_rte_handler_install(DMA_TRAP_CODE, dma_firq_handler);
@@ -117,33 +126,43 @@ int main(void) {
   neorv32_cpu_csr_set(CSR_MSTATUS, (1u << CSR_MSTATUS_MIE));
 
   sys_freq = NEORV32_SYSINFO->CLK;
-  has_zicntr = (neorv32_cpu_csr_read(CSR_MXISA) & (1u << CSR_MXISA_ZICNTR)) != 0u;
+  // has_zicntr = (neorv32_cpu_csr_read(CSR_MXISA) & (1u << CSR_MXISA_ZICNTR)) != 0u;
 
   if (neorv32_cfs_available() == 0) {
     neorv32_uart0_printf("[ERROR] No CFS synthesized!\n");
     return 1;
   }
-
-  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU DMA-driven multi-image inference >>>\n\n");
-  if (!has_zicntr) {
-    neorv32_uart0_printf("[WARNING] Zicntr hardware counters DISABLED. Timing skipped.\n");
+  if (!neorv32_clint_available()) {
+    neorv32_uart0_printf("[ERROR] No CLINT synthesized!\n");
+    return 1;
   }
 
-  GET_TIME_US("Version read", {
+  neorv32_uart0_printf("\n<<< NEORV32 TinyTPU DMA-driven multi-image inference >>>\n\n");
+  // if (!has_zicntr) {
+  //   neorv32_uart0_printf("[WARNING] Zicntr hardware counters DISABLED. Timing skipped.\n");
+  // }
+
+  // GET_TIME_US("Version read", {
     version_value = neorv32_cfs_read_reg(CFS_REG_VERSION);
-  });
-  neorv32_uart0_printf("Version register: 0x%x\n", version_value);
+  // });
+  // neorv32_uart0_printf("Version register: 0x%x\n", version_value);
 
   if (version_value != CFS_VERSION_VALUE) {
     neorv32_uart0_printf("[ERROR] Unexpected version value.\n");
     return 2;
   }
 
+  // PIPELINE START
+  // =========================================================================
+  t_pipeline_start = neorv32_clint_time_get();
   neorv32_uart0_printf("Loading labels from external memory.\n");
   // neorv32_uart0_printf("[DEBUG] LABEL_BASE_ADDR 0x%x, label_dma_buf 0x%x, LABEL_WORD_COUNT %u.\n", 
     // LABEL_BASE_ADDR, (uint32_t)&label_dma_buf, LABEL_WORD_COUNT);
+  t_tick_start = neorv32_clint_time_get();
   dma_start_transfer(LABEL_BASE_ADDR, label_dma_buf, LABEL_WORD_COUNT);
   dma_wait_for_done();
+  t_total_labels += (neorv32_clint_time_get() - t_tick_start);
+
 
   // neorv32_uart0_printf("[DEBUG] LABELS:\n label_dma_buf[0] 0x%x, \n label_dma_buf[1] 0x%x\n",
   //   label_dma_buf[0], label_dma_buf[1] );
@@ -162,8 +181,11 @@ int main(void) {
 
     neorv32_uart0_printf("Image %u: Loading %u Pixels via DMA from EXT_MEM[0x%x].\n", img_idx, PIXEL_COUNT, image_src_addr);
     // neorv32_uart0_printf("[DEBUG] Image %u: DMA from MEM[0x%x] %u, PIXEL_WORD_COUNT %u\n", img_idx, image_src_addr, image_src_addr, PIXEL_WORD_COUNT);
+    t_tick_start = neorv32_clint_time_get();
     dma_start_transfer(image_src_addr, active_buffer, PIXEL_WORD_COUNT);
     dma_wait_for_done();
+    t_total_images += (neorv32_clint_time_get() - t_tick_start);
+
 
     unpack_pixels_to_bits(active_buffer, pixel_bits);
     neorv32_uart0_printf("Image %u: unpacked and thresholded.\n", img_idx);
@@ -181,11 +203,15 @@ int main(void) {
     neorv32_uart0_printf("Image %u: starting inference.\n", img_idx);
     neorv32_cfs_clear_frame();
     neorv32_cfs_load_image(pixel_bits, PIXEL_COUNT);
+    t_tick_start = neorv32_clint_time_get(); // obtain inference start time
+
     neorv32_cfs_start_inference();
 
-    GET_TIME_US("Inference", {
+    // GET_TIME_US("Inference", {
       status_value = neorv32_cfs_wait_for_result_irq(&prediction);
-    });
+      t_total_tpu += (neorv32_clint_time_get() - t_tick_start);
+
+    // });
 
     predictions[img_idx] = (uint8_t)prediction;
 
@@ -205,8 +231,25 @@ int main(void) {
     else neorv32_uart0_printf("[SUCCESS] Prediction matches true label.\n\n");
   }
 
+  // =========================================================================
+  // PIPELINE END
+  // =========================================================================
+  t_pipeline_end = neorv32_clint_time_get();
+
   /* -------------------------------------------------------------
-   * Evaluation & Accuracy Metrics Summary
+   * Timing Calculations (Converted from CLINT Ticks to Microseconds)
+   * ------------------------------------------------------------- */
+  uint32_t time_labels_us   = (uint32_t)((t_total_labels * 1000000ULL) / sys_freq);
+  uint32_t time_images_us   = (uint32_t)((t_total_images * 1000000ULL) / sys_freq);
+  uint32_t time_tpu_us      = (uint32_t)((t_total_tpu * 1000000ULL) / sys_freq);
+  uint32_t time_pipeline_us = (uint32_t)(((t_pipeline_end - t_pipeline_start) * 1000000ULL) / sys_freq);
+
+  // Calculate averages per image
+  uint32_t avg_img_dma_us = time_images_us / IMAGE_COUNT;
+  uint32_t avg_tpu_us     = time_tpu_us / IMAGE_COUNT;
+
+  /* -------------------------------------------------------------
+   * Report 1: Evaluation Metrics
    * ------------------------------------------------------------- */
   uint32_t crct_cnt = IMAGE_COUNT - err_cnt;
 
@@ -231,16 +274,30 @@ int main(void) {
 
   if (err_cnt > 0u) {
     neorv32_uart0_printf("Misclassified Samples Details:\n");
-    neorv32_uart0_printf("  Image Index | Predicted | True Label\n");
-    neorv32_uart0_printf("  ------------+-----------+-----------\n");
+    neorv32_uart0_printf("Image Index | Predicted | True Label\n");
+    neorv32_uart0_printf("------------+-----------+-----------\n");
     for (uint32_t i = 0u; i < IMAGE_COUNT; ++i) {
       if (predictions[i] != true_labels[i]) {
-        neorv32_uart0_printf("      %u       |     %u     |     %u\n", i, predictions[i], true_labels[i]);
+        neorv32_uart0_printf("     %u     |     %u     |     %u\n", i, predictions[i], true_labels[i]);
       }
     }
   } else {
     neorv32_uart0_printf("Perfect Classification! 0 errors encountered.\n");
   }
+  neorv32_uart0_printf("=======================================================\n\n");
+
+  neorv32_uart0_printf("\n=======================================================\n");
+  neorv32_uart0_printf("                     TIMING REPORT                       \n");
+  neorv32_uart0_printf("=========================================================\n");
+  neorv32_uart0_printf("System Clock Frequency  : %u KHz\n", sys_freq / 1000u);
+  neorv32_uart0_printf("-------------------------------------------------------\n");
+  neorv32_uart0_printf("Label Loading (DMA)     : %u us (Total for %u labels)\n", time_labels_us, IMAGE_COUNT);
+  neorv32_uart0_printf("Image Loading (DMA)     : %u us (Total for %u images)\n", time_images_us, IMAGE_COUNT);
+  neorv32_uart0_printf("TPU Operation Time      : %u us (Total for %u images)\n", time_tpu_us, IMAGE_COUNT);
+  neorv32_uart0_printf("Total Pipeline Latency  : %u us\n", time_pipeline_us);
+  neorv32_uart0_printf("-------------------------------------------------------\n");
+  neorv32_uart0_printf("Avg Image Fetch Latency : %u us / image\n", avg_img_dma_us);
+  neorv32_uart0_printf("Avg TPU Inference Time  : %u us / image\n", avg_tpu_us);
   neorv32_uart0_printf("=======================================================\n\n");
 
   neorv32_cfs_irq_disable();

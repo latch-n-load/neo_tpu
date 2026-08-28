@@ -156,7 +156,7 @@ uint32_t neorv32_cfs_wait_for_result_irq(uint32_t *prediction) {
   neorv32_cfs_irq_pending = 0u;
 
   while (neorv32_cfs_irq_pending == 0u) {
-    neorv32_cpu_sleep();
+    // neorv32_cpu_sleep();
   }
 
   *prediction = neorv32_cfs_irq_prediction;
