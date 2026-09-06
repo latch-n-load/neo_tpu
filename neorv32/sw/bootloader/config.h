@@ -25,7 +25,7 @@
 
 // UART0 baud rate
 #ifndef UART_BAUD
-#define UART_BAUD 19200
+#define UART_BAUD 921600 // Ale: testing higest baudrate
 #endif
 
 // Enable UART0 hardware flow control (0,1)
