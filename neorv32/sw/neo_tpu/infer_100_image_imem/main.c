@@ -394,7 +394,7 @@ int main(void) {
   test_hash = upd_hash(test_hash, err_cnt);
 
   // Transmit exactly 4 bytes (8 hex characters) to Python
-  LOG_HASH("HASH:%x\n", test_hash);
+  LOG_HASH("%x", test_hash);
 
   neorv32_cfs_irq_disable();
   neorv32_gpio_pin_set(0, 1);
