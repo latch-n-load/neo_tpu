@@ -393,8 +393,8 @@ int main(void) {
   test_hash = upd_hash(test_hash, (uint32_t)time_pipeline_us);
   test_hash = upd_hash(test_hash, err_cnt);
 
-  // Transmit exactly 4 bytes (8 hex characters) to Python
-  LOG_HASH("%x", test_hash);
+  // Transmit 4B hash terminating with \n indicating end line, from UART to python
+  LOG_HASH("%x\n", test_hash);
 
   neorv32_cfs_irq_disable();
   neorv32_gpio_pin_set(0, 1);
