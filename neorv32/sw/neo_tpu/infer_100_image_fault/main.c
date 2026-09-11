@@ -1,6 +1,6 @@
 /**********************************************************************//**
  * @file neo_tpu/main.c
- * @brief Hashed, DMA-driven multi-image MNIST inference demo for NEORV32.
+ * @brief CRCed, DMA-driven multi-image MNIST inference demo for NEORV32.
  * @details Images and labels are read from external memory by DMA, unpacked,
  * thresholded to 1-bit pixels, and passed to the CFS TPU. Low performance due to
  * sequential algorithm - NEORV32 sleeps while DMA and CFS are working.
@@ -13,15 +13,15 @@
 /* -------------------------------------------------------------
  * Logging Configuration
  * ------------------------------------------------------------- */
-#define LOG_LEVEL_HASH 0 // Final Test Hash Only
+#define LOG_LEVEL_FAULT 0 // Final Test CRC Only
 #define LOG_LEVEL_LOW  1 // Prologue, Fatal Errors, and Final Reports 
 #define LOG_LEVEL_MID  2 // Initialization steps and periodic progress updates
 #define LOG_LEVEL_HIGH 3 // Verbose: DEBUG and detailed info
 
 // Global runtime log level variable
-uint8_t log_lvl = LOG_LEVEL_LOW; 
+uint8_t log_lvl = LOG_LEVEL_MID; 
 
-#define LOG_HASH(...)  neorv32_uart0_printf(__VA_ARGS__)
+#define LOG_FAULT(...)  neorv32_uart0_printf(__VA_ARGS__)
 
 #define LOG_LOW(...)  do { \
     if (log_lvl >= LOG_LEVEL_LOW) neorv32_uart0_printf(__VA_ARGS__); \
@@ -35,10 +35,17 @@ uint8_t log_lvl = LOG_LEVEL_LOW;
     if (log_lvl >= LOG_LEVEL_HIGH) neorv32_uart0_printf(__VA_ARGS__); \
 } while(0)
 
+// Fault Bit Definitions
+#define F_BIT_CLINT 127
+#define F_BIT_DMA_LBL 126
+#define F_BIT_DMA_IMG 125
+// #define F_BIT_UNPK_LABELS 123
+// #define F_BIT_UNPK_PIXELS 122
+// Helper macro to set a bit in the 128-bit vector
+#define SET_F_BIT(bit) (fault_vec[(bit) / 32] |= (1 << ((bit) % 32)))
 
-/* -------------------------------------------------------------
- * Application Configuration
- * ------------------------------------------------------------- */
+
+// Application Configuration
 #define BAUD_RATE 921600u
 #define PIXEL_COUNT 784u
 #define PIXEL_ENTRY_COUNT CFS_IMAGE_BYTE_COUNT
@@ -54,7 +61,8 @@ extern uint64_t neorv32_cfs_get_total_ticks(void);
 
 static uint32_t sys_freq = 0;
 volatile uint32_t dma_irq_pending = 0u;
-const char* log_lvl_nomi[4] = {"LOG_LEVEL_HASH", "LOG_LEVEL_LOW", "LOG_LEVEL_MID", "LOG_LEVEL_HIGH"};
+const char* log_lvl_nomi[4] = {"LOG_LEVEL_CRC", "LOG_LEVEL_LOW", "LOG_LEVEL_MID", "LOG_LEVEL_HIGH"};
+volatile uint32_t fault_vec[4] = {0, 0, 0, 0};
 
 // DMA Timing Accumulators
 volatile uint64_t dma_start_tick = 0;
@@ -62,6 +70,7 @@ volatile uint64_t dma_total_label_ticks = 0;
 volatile uint64_t dma_total_image_ticks = 0;
 volatile uint8_t  dma_is_label = 0;
 volatile uint32_t img_idx = 0u;
+volatile uint32_t dma_timeout_us = 0u; // depends on transfer size, and time per word (assuming 100us per word)
 
 void dma_firq_handler(void) {
   uint64_t end_tick = neorv32_clint_time_get();
@@ -75,10 +84,20 @@ void dma_firq_handler(void) {
   }
 }
 
-static void dma_wait_for_done(void) {
+static uint8_t dma_wait_for_done(uint32_t dma_timeout_us, uint8_t is_img) {
+  uint64_t timeout_ticks = ((uint64_t)dma_timeout_us * (uint64_t)sys_freq) / 1000000ULL;
+  uint64_t dma_duration = 0ULL;
   while (dma_irq_pending == 0u) {
-    neorv32_cpu_sleep(); // wfi
+    // neorv32_cpu_sleep(); // wfi
+    if ((neorv32_clint_time_get() - dma_start_tick) > timeout_ticks) {
+      SET_F_BIT (is_img ? F_BIT_DMA_IMG : F_BIT_DMA_LBL); // Set fault bit for image or labels
+      return 1;
+    }
   }
+  dma_duration = neorv32_clint_time_get() - dma_start_tick;
+  LOG_MID("timeout_ticks = %x%x, dma_duration = %x%x\n", 
+        (uint32_t)(timeout_ticks >> 32), (uint32_t)timeout_ticks, (uint32_t)(dma_duration >> 32), (uint32_t)dma_duration);
+  return 0;
 }
 
 static void dma_start_transfer(uint32_t src_addr, uint32_t *dst_words, uint32_t word_count, uint8_t is_label) {
@@ -119,20 +138,6 @@ static void unpack_labels(const uint32_t *src_words, uint8_t *dst_labels) {
   }
 }
 
-uint32_t upd_hash(uint32_t cur_hash, uint32_t new_data) {
-    // Unrolled FNV-1a hash using bitwise shifts
-    cur_hash ^= (new_data & 0xFF);
-    cur_hash *= 0x01000193;
-    cur_hash ^= ((new_data >> 8) & 0xFF);
-    cur_hash *= 0x01000193;    
-    cur_hash ^= ((new_data >> 16) & 0xFF);
-    cur_hash *= 0x01000193;   
-    cur_hash ^= ((new_data >> 24) & 0xFF);
-    cur_hash *= 0x01000193;
-    
-    return cur_hash;
-}
-
 int main(void) { 
   uint8_t pixel_bits[PIXEL_ENTRY_COUNT] = {0};
   uint32_t pixel_dma_buf_0[PIXEL_WORD_COUNT]; // Int. Memory buffer for current image fetched via DMA
@@ -140,7 +145,7 @@ int main(void) {
   uint32_t label_dma_buf[LABEL_WORD_COUNT] = {0}; // Int. Memory buffer for labels fetched via DMA
   uint8_t true_labels[IMAGE_COUNT] = {0};
   uint8_t predictions[IMAGE_COUNT] = {0};
-  uint32_t test_hash = 0x811c9dc5; // FNV offset basis
+  // uint32_t test_crc = 0xffffffff; // Initial CRC
   
   uint32_t version_value = 0u, status_value = 0u, prediction = 0u;
   uint16_t err_cnt = 0u;
@@ -169,6 +174,16 @@ int main(void) {
     LOG_LOW("[ERROR] No CLINT synthesized!\n");
     return 1;
   }
+  else { // Check if clint timer works
+    uint64_t clint_start_tick = neorv32_clint_time_get();
+    for(volatile uint8_t k=0; k<10; k++); 
+    uint64_t clint_end_tick = neorv32_clint_time_get();
+
+    if (clint_start_tick == clint_end_tick || clint_start_tick == 0) {
+        LOG_LOW("[ERROR] CLINT unresponsive!\n");
+        SET_F_BIT(F_BIT_CLINT);
+    }
+  }
 
   /* -------------------------------------------------------------
    * Interactive Boot and Log Level Selection
@@ -178,10 +193,10 @@ int main(void) {
   neorv32_uart0_printf("===========================================================\n\n");
   
   neorv32_uart0_printf("Select Log Level:\n");
-  neorv32_uart0_printf("0 : LOG_LEVEL_HASH HASH only\n");
-  neorv32_uart0_printf("1 : LOG_LEVEL_LOW Reports \n");
-  neorv32_uart0_printf("2 : LOG_LEVEL_MID Progress & Init Info\n");
-  neorv32_uart0_printf("3 : LOG_LEVEL_HIGH Verbose Debug\n");
+  neorv32_uart0_printf("0 : LOG_LEVEL_FAULT Fault Vector only\n");
+  neorv32_uart0_printf("1 : LOG_LEVEL_LOW   Reports \n");
+  neorv32_uart0_printf("2 : LOG_LEVEL_MID   Progress & Init Info\n");
+  neorv32_uart0_printf("3 : LOG_LEVEL_HIGH  Verbose Debug\n");
   neorv32_uart0_printf("Enter choice (0-3): ");
 
   // Poll UART until valid input is received
@@ -217,7 +232,7 @@ int main(void) {
     LABEL_BASE_ADDR, (uint32_t)&label_dma_buf, LABEL_WORD_COUNT);
   // DMA labels with busy wait, sequential.
   dma_start_transfer(LABEL_BASE_ADDR, label_dma_buf, LABEL_WORD_COUNT, 1);
-  dma_wait_for_done();
+  dma_wait_for_done(LABEL_WORD_COUNT * 100u, 0);
   // #if LOG_LEVEL == LOG_LEVEL_HIGH
   //   LOG_HIGH("[DEBUG] NEORV32 Internal Memory Buffer for Labels fetched via DMA\n");
   //   for (uint32_t lbl_wrd_i = 0; lbl_wrd_i < LABEL_WORD_COUNT; lbl_wrd_i++) {
@@ -233,7 +248,7 @@ int main(void) {
   LOG_HIGH("[DEBUG] Image %u: Starting DMA Transfer, src_addr 0x%x, dst_words 0x%x, word_count %u, is_label %u\n", 
    img_idx, EXT_MEM_BASE, (uint32_t)&pixel_dma_buf_0, PIXEL_WORD_COUNT, 0);
   dma_start_transfer(EXT_MEM_BASE, pixel_dma_buf_0, PIXEL_WORD_COUNT, 0);
-  dma_wait_for_done();
+  dma_wait_for_done(PIXEL_WORD_COUNT * 100u, 1);
 
   neorv32_cfs_clear_frame();
   status_value = neorv32_cfs_read_reg(CFS_REG_STATUS);
@@ -272,15 +287,16 @@ int main(void) {
         LOG_MID("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
                 prev_idx, prediction, true_labels[prev_idx], status_value);
         
-        // Update test hash
-        test_hash = upd_hash(test_hash, status_value);
-        test_hash = upd_hash(test_hash, prediction);
-        LOG_MID("Image %u: Post Infer HASH = %x\n", prev_idx, test_hash);
+        // Update test crc
+        // test_crc = crc32_update_word(test_crc, status_value); 
+        // test_crc = crc32_update_word(test_crc, prediction);
+        // LOG_MID("Image %u: Post Infer CRC = %x\n", prev_idx, test_crc);
                 
         predictions[prev_idx] = (uint8_t)prediction;
         if (prediction != true_labels[prev_idx]) {
           LOG_MID("[ERROR] Mismatch for image %u.\n\n", prev_idx);
           err_cnt++;
+          fault_vec[prev_idx / 32] |= (1 << (prev_idx % 32));
         } else {
           LOG_MID("[SUCCESS] Prediction matches true label.\n\n");
         }
@@ -298,8 +314,7 @@ int main(void) {
     if (img_idx + 1 < IMAGE_COUNT) {
         uint32_t next_idx = img_idx + 1;
         LOG_HIGH("[DEBUG] Image %u: initiating wait for DMA fetch of Image %u.\n", img_idx, next_idx);
-        dma_wait_for_done();
-        LOG_HIGH("[DEBUG] Image %u: DMA done.\n", next_idx);
+        dma_wait_for_done(PIXEL_WORD_COUNT * 100u, 1);
     }
   }
 
@@ -311,14 +326,16 @@ int main(void) {
   LOG_MID("Image %u: Inference Complete.\n", IMAGE_COUNT - 1); 
   LOG_MID("Image %u: Prediction=%u, Label=%u, Status=0x%x\n",
           IMAGE_COUNT - 1, prediction, true_labels[IMAGE_COUNT - 1], status_value);
-  // Update test hash
-  test_hash = upd_hash(test_hash, status_value);
-  test_hash = upd_hash(test_hash, prediction);
-  LOG_MID("Image %u: Post Infer HASH = %x\n", IMAGE_COUNT - 1, test_hash);
+
+  // Update test_crc
+  // test_crc = crc32_update_word(test_crc, status_value); 
+  // test_crc = crc32_update_word(test_crc, prediction);
+  // LOG_MID("Image %u: Post Infer CRC = %x\n", IMAGE_COUNT - 1, test_crc);
   
   if (prediction != true_labels[IMAGE_COUNT - 1]) {
       LOG_MID("[ERROR] Mismatch for image %u.\n\n", IMAGE_COUNT - 1);
       err_cnt++;
+      fault_vec[(IMAGE_COUNT - 1) / 32] |= (1 << ((IMAGE_COUNT - 1) % 32));
     }
     else LOG_MID("[SUCCESS] Prediction matches true label.\n\n");
 
@@ -390,11 +407,10 @@ int main(void) {
   LOG_LOW("Avg Pipeline Throughput: %u inferences / second\n", (1000000u * IMAGE_COUNT) / time_pipeline_us);
   LOG_LOW("=======================================================\n\n");
 
-  test_hash = upd_hash(test_hash, (uint32_t)time_pipeline_us);
-  test_hash = upd_hash(test_hash, err_cnt);
-
   // Transmit exactly 4 bytes (8 hex characters) to Python
-  LOG_HASH("HASH:%x\n", test_hash);
+  // test_crc ^= 0xFFFFFFFF; // Invert CRC for final output
+  // LOG_CRC("CRC:%x\n", test_crc);
+  LOG_FAULT("FAULT_VEC:%x%x%x%x\n", fault_vec[3], fault_vec[2], fault_vec[1], fault_vec[0]);
 
   neorv32_cfs_irq_disable();
   neorv32_gpio_pin_set(0, 1);
