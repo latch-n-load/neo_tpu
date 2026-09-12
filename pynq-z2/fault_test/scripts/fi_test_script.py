@@ -5,7 +5,7 @@ import csv
 import os
 
 # --- Configuration ---
-GOLDEN_BITSTREAM = "../../bitstreams/neo_tpu_pynq/infer_100_img_btlder_uart921k_crc.bit" # TODO replace with 921k imem crc
+GOLDEN_BITSTREAM = "../../bitstreams/neo_tpu_pynq/infer_100_img_btlder_uart921k_fv.bit" # TODO replace with 921k imem crc
 UART_PORT = "/dev/ttyUSB0"      # TODO: Address to UART port
 BAUD_RATE = 921600
 TEST_ITERATIONS = 10            # TODO: To be set to 10,000 for full campaign
