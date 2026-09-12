@@ -1,6 +1,6 @@
 /**********************************************************************//**
  * @file neo_tpu/main.c
- * @brief CRCed, DMA-driven multi-image MNIST inference demo for NEORV32.
+ * @brief Fault Testing, DMA-driven multi-image MNIST inference demo for NEORV32.
  * @details Images and labels are read from external memory by DMA, unpacked,
  * thresholded to 1-bit pixels, and passed to the CFS TPU. Low performance due to
  * sequential algorithm - NEORV32 sleeps while DMA and CFS are working.
@@ -13,7 +13,7 @@
 /* -------------------------------------------------------------
  * Logging Configuration
  * ------------------------------------------------------------- */
-#define LOG_LEVEL_FAULT 0 // Final Test CRC Only
+#define LOG_LEVEL_FAULT 0 // Final Fault Vector Only
 #define LOG_LEVEL_LOW  1 // Prologue, Fatal Errors, and Final Reports 
 #define LOG_LEVEL_MID  2 // Initialization steps and periodic progress updates
 #define LOG_LEVEL_HIGH 3 // Verbose: DEBUG and detailed info
@@ -61,7 +61,7 @@ extern uint64_t neorv32_cfs_get_total_ticks(void);
 
 static uint32_t sys_freq = 0;
 volatile uint32_t dma_irq_pending = 0u;
-const char* log_lvl_nomi[4] = {"LOG_LEVEL_CRC", "LOG_LEVEL_LOW", "LOG_LEVEL_MID", "LOG_LEVEL_HIGH"};
+const char* log_lvl_nomi[4] = {"LOG_LEVEL_FAULT", "LOG_LEVEL_LOW", "LOG_LEVEL_MID", "LOG_LEVEL_HIGH"};
 volatile uint32_t fault_vec[4] = {0, 0, 0, 0};
 
 // DMA Timing Accumulators
@@ -305,11 +305,9 @@ int main(void) {
     // 4. Load & Start TPU inference for CURRENT image
     neorv32_cfs_clear_frame();
     neorv32_cfs_load_image(pixel_bits, PIXEL_COUNT);
-    LOG_HIGH("[DEBUG] Image %u: loaded to TPU.\n", img_idx);
+    LOG_MID("Image %u: loaded to TPU, starting inference.\n", img_idx);
 
     neorv32_cfs_start_inference();
-    LOG_HIGH("[DEBUG] Image %u: Start sent to TPU.\n", img_idx);
-
     // 5. Wait for the NEXT image's DMA transfer to finish before looping back to unpack it
     if (img_idx + 1 < IMAGE_COUNT) {
         uint32_t next_idx = img_idx + 1;
