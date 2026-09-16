@@ -16,6 +16,7 @@ TIMEOUT_SEC = 30                # 30-second fatal crash timeout
 PROGRAM_FPGA = "program_fpga.tcl"
 
 def run_fault_campaign():
+    # st_time = time.time()
     print("Starting Fault Injection Campaign...")
     
     # 1. Open the physical UART port
@@ -36,11 +37,8 @@ def run_fault_campaign():
             corrupt_bit_file = f"{CORRUPT_BITSTREAMS}/fi_bit_{i}.bit"
 
             try:
-                # --- STEP A: Bitstream Fault Injection ---
-                # Using subprocess to call "pixel" tool in terminal.
-                # TODO: Adjust the arguments to match how 'pixel' actually works
-                subprocess.run(["pixel", "--input", GOLDEN_BITSTREAM, "--output", corrupt_bit_file], 
-                                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                # # --- STEP A: Bitstream Fault Injection 
+                generate_faulty_bitstreams();
                 
                 # --- STEP B: Flash the Board ---
                 # Call XSCT with tcl script to program FGPA on JTAG.
@@ -79,6 +77,8 @@ def run_fault_campaign():
 
     ser.close()
     print(f"Campaign Complete. Results saved to {TEST_RESULTS}")
+    # end_time = time.time()
+    # print(f"Total Time: {end_time - st_time:.2f} seconds")
 
 if __name__ == "__main__":
     # Ensure the output directory exists
