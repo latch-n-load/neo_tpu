@@ -7,7 +7,14 @@ set bitstream_file [lindex $argv 0]
 # Connect to the physical JTAG hardware 
 connect
 # TODO check if name matches FPGA
-targets -set -filter {name =~ "xc7z020*"}
+# Example
+# 1  Xilinx HW-USB-II-G 0000185e495201  <-- (Someone else's UltraScale+ cable)
+#      2  arm_dap (idcode: 4ba06477)
+#      3  xczu9eg (idcode: 14730093)      <-- (The UltraScale+ FPGA)
+#   4  Digilent JTAG-SMT2 210279A42321    <-- (Your PYNQ-Z2 cable & Serial!)
+#      5  arm_dap (idcode: 4ba00477)
+#      6  xc7z020 (idcode: 23727093)      <-- (Your XC7Z020 FPGA!)
+targets -set -filter {jtag_cable_serial == "210279A42321" && name =~ "xc7z020*"}
 
 # Attempt to program the FPGA and catch any hardware/file errors
 if { [catch {fpga -file $bitstream_file} result] } {
