@@ -19,7 +19,7 @@
 #define LOG_LEVEL_HIGH 3 // Verbose: DEBUG and detailed info
 
 // Global runtime log level variable
-uint8_t log_lvl = LOG_LEVEL_MID; 
+#define log_lvl LOG_LEVEL_FAULT
 
 #define LOG_FAULT(...)  neorv32_uart0_printf(__VA_ARGS__)
 
@@ -188,30 +188,30 @@ int main(void) {
   /* -------------------------------------------------------------
    * Interactive Boot and Log Level Selection
    * ------------------------------------------------------------- */
-  neorv32_uart0_printf("\n===========================================================\n");
-  neorv32_uart0_printf(" NEORV32 TinyTPU Pipelined Multi-Image Classification\n");
-  neorv32_uart0_printf("===========================================================\n\n");
+  // neorv32_uart0_printf("\n===========================================================\n");
+  // neorv32_uart0_printf(" NEORV32 TinyTPU Pipelined Multi-Image Classification\n");
+  // neorv32_uart0_printf("===========================================================\n\n");
   
-  neorv32_uart0_printf("Select Log Level:\n");
-  neorv32_uart0_printf("0 : LOG_LEVEL_FAULT Fault Vector only\n");
-  neorv32_uart0_printf("1 : LOG_LEVEL_LOW   Reports \n");
-  neorv32_uart0_printf("2 : LOG_LEVEL_MID   Progress & Init Info\n");
-  neorv32_uart0_printf("3 : LOG_LEVEL_HIGH  Verbose Debug\n");
-  neorv32_uart0_printf("Enter choice (0-3): ");
+  // neorv32_uart0_printf("Select Log Level:\n");
+  // neorv32_uart0_printf("0 : LOG_LEVEL_FAULT Fault Vector only\n");
+  // neorv32_uart0_printf("1 : LOG_LEVEL_LOW   Reports \n");
+  // neorv32_uart0_printf("2 : LOG_LEVEL_MID   Progress & Init Info\n");
+  // neorv32_uart0_printf("3 : LOG_LEVEL_HIGH  Verbose Debug\n");
+  // neorv32_uart0_printf("Enter choice (0-3): ");
 
   // Poll UART until valid input is received
-  while (1) {
-    if (neorv32_uart0_available()) {
-      char log_in = neorv32_uart0_getc();
-      if (log_in >= '0' && log_in <= '3') {
-        log_lvl = (uint8_t)(log_in - '0');
-        neorv32_uart0_printf("%c\n\n", log_in); // Echo character to terminal
-        break;
-      } else {
-        neorv32_uart0_printf("\nInvalid input. Enter 0, 1, 2, or 3: ");
-      }
-    }
-  }
+  // while (1) {
+  //   if (neorv32_uart0_available()) {
+  //     char log_in = neorv32_uart0_getc();
+  //     if (log_in >= '0' && log_in <= '3') {
+  //       log_lvl = (uint8_t)(log_in - '0');
+  //       neorv32_uart0_printf("%c\n\n", log_in); // Echo character to terminal
+  //       break;
+  //     } else {
+  //       neorv32_uart0_printf("\nInvalid input. Enter 0, 1, 2, or 3: ");
+  //     }
+  //   }
+  // }
 
   LOG_LOW("Logging at: %s\n\n", log_lvl_nomi[log_lvl]);
 
@@ -408,7 +408,7 @@ int main(void) {
   // Transmit exactly 4 bytes (8 hex characters) to Python
   // test_crc ^= 0xFFFFFFFF; // Invert CRC for final output
   // LOG_CRC("CRC:%x\n", test_crc);
-  LOG_FAULT("FAULT_VEC:%x%x%x%x\n", fault_vec[3], fault_vec[2], fault_vec[1], fault_vec[0]);
+  LOG_FAULT("%x%x%x%x\n", fault_vec[3], fault_vec[2], fault_vec[1], fault_vec[0]);
 
   neorv32_cfs_irq_disable();
   neorv32_gpio_pin_set(0, 1);
