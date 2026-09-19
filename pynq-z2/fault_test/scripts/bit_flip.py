@@ -1,20 +1,30 @@
 import time
 import os
+import shutil
 import re
+import random
 
 # --- Configuration ---
-GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq/neo_tpu_pynq.runs/impl_1/neo_tpu_pynq_wrapper.bit"  # TODO: Point this to your actual .bit file
-LL_FILE = "/home/a_akif/tesi/neo_tpu_pynq/neo_tpu_pynq.runs/impl_1/neo_tpu_pynq_wrapper.ll"            # TODO: Point this to your actual .ll file
+GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.bit"
+LL_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ll"
+EBD_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ebd" 
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
 
 # Zynq-7000 / Artix-7 Specific Parameters
 SYNC_WORD = b'\xAA\x99\x55\x66' # 0xAA995566
-WORDS_PER_FRAME = 101
+# WORDS_PER_FRAME = 101
 BYTES_PER_WORD = 4
 
-# Target Node for Fault Injection
-TARGET_NODE = "neo_tpu" # Set node search term
-MAX_NODE_TARGS = 10000    # Maximum targets to corrupt for specified node
+# --- Campaign Mode Selection ---
+# 1: Target specific Verilog nodes using the .ll file (Diagnostic)
+# 2: Target random routing/LUTs using .ebd set subtraction (Statistical)
+CAMPAIGN_PHASE = 2
+
+# Phase 1 Config
+LL_TARG_NODE = "neo_tpu" # Set node search term
+MAX_PHASE1_TARGS = 50    # Maximum targets to corrupt for specified node
+# Phase 2 Config
+MAX_PHASE2_TARGS = 50 # Number of random routing/LUT bits to attack
 
 def find_sync_word(bit_data):
     """
@@ -25,10 +35,10 @@ def find_sync_word(bit_data):
         print("[!] ERROR: Sync word 0xAA995566 not found! Cannot inject faults")
         return -1
     
-    print(f"[+] Sync word found at byte index: {sync_idx} (0x{sync_idx:08X})")
+    print(f"    Sync word found at byte index: {sync_idx} (0x{sync_idx:08X})")
     return sync_idx
 
-def parse_ll_file(ll_filepath, target_keyword, max_node_targs):
+def get_ll_targs(ll_filepath, target_keyword, MAX_PHASE1_TARGS):
     """
     Parse Vivado .ll file and extract absolute bit offsets for specified target node.
     Returns a list of dictionaries containing injection coordinates.
@@ -54,64 +64,33 @@ def parse_ll_file(ll_filepath, target_keyword, max_node_targs):
                             'info': match.group(4)
                         })
                         
-                        if len(targets) >= max_node_targs:
+                        if len(targets) >= MAX_PHASE1_TARGS:
                             break
                             
     except FileNotFoundError:
         print(f"[!] ERROR: Could not find .ll file at {ll_filepath}")
         return []
 
-    print(f"[+] Found {len(targets)} injection targets matching '{target_keyword}'.")
+    print(f"    Found {len(targets)} injection targets matching '{target_keyword}'.")
     return targets
 
-# def get_raw_data_start(bit_data):
-#     """
-#     Parse .bit file header to find exactly where the raw configuration data begins.
-#     The .ll file offsets are relative to this point.
-#     """
-#     ptr = 0
-    
-#     # 1. Dummy string length (usually 0x0009)
-#     length = int.from_bytes(bit_data[ptr:ptr+2], 'big')
-#     ptr += 2 + length
-    
-#     # 2. Skip 2-byte header separator (0x00 0x01)
-#     ptr += 2
-    
-#     # Field 'a': Design Name
-#     if bit_data[ptr] == 0x61: 
-#         ptr += 1
-#     else: 
-#         print(f"[!] Error: Expected 0x61 ('a'), found 0x{bit_data[ptr]:02X} at offset {ptr}")
-#         return -1
-#     length = int.from_bytes(bit_data[ptr:ptr+2], 'big')
-#     ptr += 2 + length
-#     # print(f"[DEBUG] Design Name Length: {length} bytes, skipped to offset {ptr}")
-    
-#     # Field 'b': Part Name
-#     if bit_data[ptr] == 0x62: ptr += 1
-#     length = int.from_bytes(bit_data[ptr:ptr+2], 'big')
-#     ptr += 2 + length
-    
-#     # Field 'c': Date
-#     if bit_data[ptr] == 0x63: ptr += 1
-#     length = int.from_bytes(bit_data[ptr:ptr+2], 'big')
-#     ptr += 2 + length
-    
-#     # Field 'd': Time
-#     if bit_data[ptr] == 0x64: ptr += 1
-#     length = int.from_bytes(bit_data[ptr:ptr+2], 'big')
-#     ptr += 2 + length
-    
-#     # Field 'e': Raw Data Length (4 bytes)
-#     if bit_data[ptr] == 0x65: ptr += 1
-#     else: return -1
-#     length = int.from_bytes(bit_data[ptr:ptr+4], 'big')
-#     ptr += 4
-    
-#     return ptr, length
+def get_all_ll_bits(ll_filepath):
+    """Extracts every absolute bit offset mapped in the .ll file to be used for set subtraction."""
+    ll_bits = set()
+    ll_regex = re.compile(r"^Bit\s+(\d+)\s+")
+    try:
+        with open(ll_filepath, 'r') as f:
+            for line in f:
+                match = ll_regex.match(line.strip())
+                if match:
+                    ll_bits.add(int(match.group(1)))
+        print(f"[*] Total annotated state/memory bits extracted from .ll file: {len(ll_bits)} bits")
+        return ll_bits
+    except FileNotFoundError:
+        print(f"[!] ERROR: Could not find .ll file at {ll_filepath}")
+        return set()
 
-def analyze_ll_file(filepath):
+def get_ll_stats(filepath):
     """
     Parses a Xilinx .ll file to extract the min/max ranges and the total 
     number of unique entries for absolute offsets, frame addresses, and frame offsets.
@@ -175,23 +154,61 @@ def analyze_ll_file(filepath):
     except FileNotFoundError:
         print(f"[!] ERROR: Could not find file at {filepath}")
 
+def get_essential_bits(ebd_filepath):
+    """Parse .ebd file. Get total bits, and set of all absolute bit offsets designated as essential logic/routing."""
+    essential_bits = set()
+    print(f"[*] Parsing .ebd file ...")
+    try:
+        with open(ebd_filepath, 'r') as f:
+            ebd_data = ""
+            ebd_regex = re.compile(r"Bits:\s+(\d+)\s+") # Capture total bits in .ebd
+            for line in f:
+                clean_line = line.strip()
+                ebd_match = ebd_regex.match(clean_line)
+                if ebd_match:
+                    print(f"[*] Total bits (essential + non-essential) in .ebd file: {ebd_match.group(1)}")
+                # Skip text header, grab the continuous string of 1s and 0s
+                if clean_line.startswith('0') or clean_line.startswith('1'):
+                    ebd_data += clean_line
+
+        # Get absolute bit offsets of all 1s (essential bits)
+        for idx, bit_char in enumerate(ebd_data):
+            if bit_char == '1':
+                essential_bits.add(idx)
+                
+        print(f"    Total essential bits in .ebd file: {len(essential_bits)} bits")
+        return essential_bits
+    except FileNotFoundError:
+        print(f"[!] ERROR: Could not find .ebd file at {ebd_filepath}.")
+        return set()
+
 def get_fdri_data_start(bit_data):
     """
     Searches the bitstream for the standard Xilinx FDRI Write command sequence.
     The .ll file absolute offsets begin exactly after this command.
     """
-    # 0x30004000 is the Type 1 Write to FDRI command.
-    # It is immediately followed by a Type 2 command starting with 0x50 to 0x57 (depending on word count).
-    pattern = re.compile(b'\x30\x00\x40\x00[\x50-\x57]')
+    # Type 1 Write to FDRI command = 0x30004000
+    # Type 2 Write to FDRI = Begins with 0x5 followed by 28 bits indicating bitstream WORD_COUNT
+    pattern = re.compile(b'\x30\x00\x40\x00')
     match = pattern.search(bit_data)
     
     if not match:
-        print("[!] ERROR: Could not find FDRI write command sequence. Is this a valid bitstream?")
+        print("[!] ERROR: Could not find FDRI write command sequence.")
         return -1
         
-    # The frame data payload starts exactly 8 bytes after the start of the match
-    # (4 bytes for Type 1 command + 4 bytes for Type 2 command)
+    start_fdri_t2 = match.start() + 4
+    start_fdri_bytes = bit_data[start_fdri_t2:start_fdri_t2 + 4]
+    start_fdri_word = int.from_bytes(start_fdri_bytes, byteorder='big')
+
+    if (start_fdri_word >> 28) != 0x5:
+        print("[!] ERROR: Type 2 Write FDRI command does not begin with 0x5 header.")
+        return -1
+    
     fdri_data_start = match.start() + 8
+    print(f"    Bitstream design payload begins at .bit offset: {fdri_data_start} (0x{fdri_data_start:08X})")
+    word_count = start_fdri_word & 0x0FFFFFFF
+    print(f"    Total bitstream payload in .bit: {word_count * BYTES_PER_WORD * 8} bits")
+
     
     return fdri_data_start
 
@@ -225,13 +242,14 @@ def flip_bit_in_bytearray(data_array, abs_bit_offset, raw_data_start):
 def generate_faulty_bitstreams():
     st_time = time.time()
     print("==================================================")
-    print("      WHITE-BOX BITSTREAM CORRUPTION ENGINE       ")
+    print("           BITSTREAM CORRUPTION ENGINE            ")
     print("==================================================")
     
-    # Create output directory
+    # Create fresh output directory
+    shutil.rmtree(CORRUPT_BITSTREAMS_DIR, ignore_errors=True)
     os.makedirs(CORRUPT_BITSTREAMS_DIR, exist_ok=True)
 
-    # 1. Load the Golden Bitstream
+    # 1a. Load Golden Bitstream
     try:
         with open(GOLDEN_BITSTREAM, 'rb') as f:
             golden_data = f.read()
@@ -243,60 +261,93 @@ def generate_faulty_bitstreams():
     # Sanity Check
     if find_sync_word(golden_data) == -1: return
 
-    # Find where the raw data starts
+    # 1b. Find where the raw data starts
     fdri_data_start = get_fdri_data_start(golden_data)
     if fdri_data_start == -1:
         return
-    
-    print(f"[*] Raw frame payload begins at file offset: {fdri_data_start} (0x{fdri_data_start:08X})")
 
     # 2a. Analyze .ll to get ranges
-    # analyze_ll_file(LL_FILE)
+    # get_ll_stats(LL_FILE)
 
-    # 2b. Parse the .ll file for targets
-    # Examples: 'RAMB36' for memory, 'dma' for DMA engine, 'neo_tpu' for TPU logic.
-    injection_targets = parse_ll_file(LL_FILE, target_keyword=TARGET_NODE, max_node_targs=MAX_NODE_TARGS)
+    # PHASE 1: Flip bits targeting annotated nodes in .ll
+    # Corrupt LL_TARG_NODE. Examples: 'RAMB36' for memory, 'dma' for DMA engine, 'neo_tpu' for TPU logic.
+    # ---------------------------------------------------------------------------------------------------
+    if CAMPAIGN_PHASE == 1:
+        print(f"\n[PHASE 1] Executing Targeted Campaign for Node: '{LL_TARG_NODE}'")
+        injection_targets = get_ll_targs(LL_FILE, target_keyword=LL_TARG_NODE, MAX_PHASE1_TARGS=MAX_PHASE1_TARGS)
     
-    if not injection_targets:
-        print("[!] No targets found. Exiting.")
-        return
+        if not injection_targets:
+            print("[!] No targets found. Exiting.")
+            return
 
-    # 3. Inject Faults and Verify
-    print("\n[*] Commencing Targeted Bit Flips...\n")
-    
-    for i, target in enumerate(injection_targets):
-        print(f"--- Injection #{i} ---")
-        print(f"Target Node : {target['info']}")
-        print(f"Frame Addr  : {target['frame_addr']} | Frame Offset: {target['frame_offset']}")
-        print(f"Abs Bit Idx : {target['abs_bit_offset']}")
+        # 3a. Inject Faults and Verify
+        print("\n[*] Commencing Targeted Bit Flips...\n")
         
-        # Make a fresh mutable copy of the golden bitstream
-        faulty_data = bytearray(golden_data)
+        for i, target in enumerate(injection_targets):
+            print(f"--- Injection #{i} ---")
+            print(f"Target Node : {target['info']}")
+            print(f"Frame Addr  : {target['frame_addr']} | Frame Offset: {target['frame_offset']}")
+            print(f"Abs Bit Idx : {target['abs_bit_offset']}")
+
+            # 3b. Fire Faults
+            faulty_data = bytearray(golden_data) # Make a copy of the golden bitstream
+            faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
+                faulty_data, target['abs_bit_offset'], fdri_data_start
+            )
+            
+            # Verify the flip visually
+            print(f"File Offset : Byte {byte_idx}, Bit {bit_in_byte}")
+            print(f"Verification: Original Byte -> {orig_bin}")
+            print(f"              Corrupt Byte  -> {corr_bin}")
+            
+            # Highlight which bit flipped
+            pointer = " " * (17 + bit_in_byte) + "^"
+            print(f"              {pointer} (Bit Flipped!)")
+            
+            # 3c. Save the corrupted bitstream
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_{LL_TARG_NODE}_{i}.bit")
+            with open(out_filepath, 'wb') as out_f:
+                out_f.write(faulty_data)
+            print(f"Saved to    : {out_filepath}\n")
+            
+        print(f"[*] Successfully generated {len(injection_targets)} corrupted bitstreams.")
+
+    # PHASE 2: ROUTING, LUT and DSP CAMPAIGN
+    # ---------------------------------------------------------
+    elif CAMPAIGN_PHASE == 2:
+        print(f"\n[PHASE 2] Executing Routing, LUT and DSP Structural Fault Injection Campaign")
+        ebd_bits = get_essential_bits(EBD_FILE) # Get bit offsets of essential logic from .ebd
+        ll_bits = get_all_ll_bits(LL_FILE)      # Get bit offsets of ll_bits to avoid repeat fault injections on same bits
         
-        # Fire the fault
-        faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
-            faulty_data, target['abs_bit_offset'], fdri_data_start
-        )
+        if not ebd_bits or not ll_bits:
+            print("[!] Missing necessary .ebd or .ll data. Exiting.")
+            return
+
+        # 4a. Perform the set subtraction to isolate untested targets
+        untested_targs = list(ebd_bits - ll_bits)
+        print(f"[*] Isolated un-tested bits (LUTs/Routing/DSPs) from .ebd for Phase 2 Injection: {len(untested_targs)} bits")
         
-        # Verify the flip visually
-        print(f"File Offset : Byte {byte_idx}, Bit {bit_in_byte}")
-        print(f"Verification: Original Byte -> {orig_bin}")
-        print(f"              Corrupt Byte  -> {corr_bin}")
-        
-        # Highlight which bit flipped
-        pointer = " " * (17 + bit_in_byte) + "^"
-        print(f"              {pointer} (Bit Flipped!)")
-        
-        # 4. Save the corrupted bitstream
-        out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"fi_{TARGET_NODE}_{i}.bit")
-        with open(out_filepath, 'wb') as out_f:
-            out_f.write(faulty_data)
-        print(f"Saved to    : {out_filepath}\n")
-        
-    print(f"[*] Successfully generated {len(injection_targets)} corrupted bitstreams.")
-    print("==================================================")
+        # 4b. Select random sample from the massive list of untested targets
+        sample_targs = min(MAX_PHASE2_TARGS, len(untested_targs))
+        selected_targs = random.sample(untested_targs, sample_targs)
+        print(f"[*] Commencing Bit Flips for {sample_targs} random targets from .ebd...\n")
+
+        # 4c. Fire Faults and Save Corrupted Bitstreams
+        for i, abs_offset in enumerate(selected_targs):
+            faulty_data = bytearray(golden_data)
+            faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
+                faulty_data, abs_offset, fdri_data_start
+            )
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_phase2_{i}.bit")
+            with open(out_filepath, 'wb') as out_f:
+                out_f.write(faulty_data)
+            print(f"  Saved : {out_filepath} (Bit flip @: {abs_offset})")
+            
+        print(f"[*] Successfully generated {sample_targs} Phase 2 bitstreams.")
+
+    else: print("[!] Invalid CAMPAIGN_PHASE selected.")
     end_time = time.time()
-    print(f"Total Time: {end_time - st_time:.2f} seconds")
+    print(f"Total Fault Injection Campaign Time: {end_time - st_time:.2f} seconds")
 
 if __name__ == "__main__":
     generate_faulty_bitstreams()
