@@ -189,7 +189,7 @@ def get_fdri_data_start(bit_data):
     """
     # Type 1 Write to FDRI command = 0x30004000
     # Type 2 Write to FDRI = Begins with 0x5 followed by 28 bits indicating bitstream WORD_COUNT
-    pattern = re.compile(b'\x30\x00\x40\x00')
+    pattern = re.compile(b'\x30\x00\x40\x00') # Binary re for 0x30004000
     match = pattern.search(bit_data)
     
     if not match:
