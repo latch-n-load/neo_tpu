@@ -22,9 +22,9 @@ CAMPAIGN_PHASE = 2
 
 # Phase 1 Config
 LL_TARG_NODE = "neo_tpu" # Set node search term
-MAX_PHASE1_TARGS = 50    # Maximum targets to corrupt for specified node
+MAX_PHASE1_TARGS = 2    # Maximum targets to corrupt for specified node
 # Phase 2 Config
-MAX_PHASE2_TARGS = 50 # Number of random routing/LUT bits to attack
+MAX_PHASE2_TARGS = 2    # Number of random routing/LUT bits to attack
 
 def find_sync_word(bit_data):
     """
@@ -44,7 +44,7 @@ def get_ll_targs(ll_filepath, target_keyword, MAX_PHASE1_TARGS):
     Returns a list of dictionaries containing injection coordinates.
     """
     targets = []
-    print(f"\n[*] Parsing .ll file for targets containing: '{target_keyword}'...")
+    print(f"[*] Parsing .ll file for targets containing: '{target_keyword}'...")
 
     # Bit lines have the following form:
     # Bit <offset> <frame address> <frame offset> <information>
@@ -71,7 +71,7 @@ def get_ll_targs(ll_filepath, target_keyword, MAX_PHASE1_TARGS):
         print(f"[!] ERROR: Could not find .ll file at {ll_filepath}")
         return []
 
-    print(f"    Found {len(targets)} injection targets matching '{target_keyword}'.")
+    print(f"    Found {len(targets)} injection targets matching '{target_keyword}'")
     return targets
 
 def get_all_ll_bits(ll_filepath):
@@ -157,16 +157,16 @@ def get_ll_stats(filepath):
 def get_essential_bits(ebd_filepath):
     """Parse .ebd file. Get total bits, and set of all absolute bit offsets designated as essential logic/routing."""
     essential_bits = set()
-    print(f"[*] Parsing .ebd file ...")
+    print(f"[*] Parsing .ebd file...")
     try:
         with open(ebd_filepath, 'r') as f:
             ebd_data = ""
-            ebd_regex = re.compile(r"Bits:\s+(\d+)\s+") # Capture total bits in .ebd
+            ebd_regex = re.compile(r"Bits:\s+(\d+)") # Capture total bits in .ebd
             for line in f:
                 clean_line = line.strip()
                 ebd_match = ebd_regex.match(clean_line)
                 if ebd_match:
-                    print(f"[*] Total bits (essential + non-essential) in .ebd file: {ebd_match.group(1)}")
+                    print(f"[*] Total bits (essential + non-essential) in .ebd file: {ebd_match.group(1)} bits")
                 # Skip text header, grab the continuous string of 1s and 0s
                 if clean_line.startswith('0') or clean_line.startswith('1'):
                     ebd_data += clean_line
@@ -246,7 +246,7 @@ def generate_faulty_bitstreams():
     print("==================================================")
     
     # Create fresh output directory
-    shutil.rmtree(CORRUPT_BITSTREAMS_DIR, ignore_errors=True)
+    # shutil.rmtree(CORRUPT_BITSTREAMS_DIR, ignore_errors=True)
     os.makedirs(CORRUPT_BITSTREAMS_DIR, exist_ok=True)
 
     # 1a. Load Golden Bitstream
@@ -281,7 +281,7 @@ def generate_faulty_bitstreams():
             return
 
         # 3a. Inject Faults and Verify
-        print("\n[*] Commencing Targeted Bit Flips...\n")
+        print("[*] Commencing Targeted Bit Flips...\n")
         
         for i, target in enumerate(injection_targets):
             print(f"--- Injection #{i} ---")
@@ -305,7 +305,7 @@ def generate_faulty_bitstreams():
             print(f"              {pointer} (Bit Flipped!)")
             
             # 3c. Save the corrupted bitstream
-            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_{LL_TARG_NODE}_{i}.bit")
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph1_{LL_TARG_NODE}_{i}.bit")
             with open(out_filepath, 'wb') as out_f:
                 out_f.write(faulty_data)
             print(f"Saved to    : {out_filepath}\n")
@@ -323,7 +323,10 @@ def generate_faulty_bitstreams():
             print("[!] Missing necessary .ebd or .ll data. Exiting.")
             return
 
-        # 4a. Perform the set subtraction to isolate untested targets
+        # 4a. Perform set subtraction to isolate untested targets
+        # TODO: Check this - ll contains state/memory type 1 (BRAM) and 0 (slice logic). 
+        # Type 1 BRAM are not available in .ebd so pre-excluded. 
+        # Subtraction only removes ALL Type 0 from ebd ~ 8200 bits
         untested_targs = list(ebd_bits - ll_bits)
         print(f"[*] Isolated un-tested bits (LUTs/Routing/DSPs) from .ebd for Phase 2 Injection: {len(untested_targs)} bits")
         
@@ -338,10 +341,10 @@ def generate_faulty_bitstreams():
             faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
                 faulty_data, abs_offset, fdri_data_start
             )
-            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_phase2_{i}.bit")
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph2_{abs_offset}_{i}.bit")
             with open(out_filepath, 'wb') as out_f:
                 out_f.write(faulty_data)
-            print(f"  Saved : {out_filepath} (Bit flip @: {abs_offset})")
+            print(f"  Saved : {out_filepath}")
             
         print(f"[*] Successfully generated {sample_targs} Phase 2 bitstreams.")
 
