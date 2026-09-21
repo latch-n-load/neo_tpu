@@ -1,0 +1,2 @@
+Test_ID,Corrupt_bitstream_filename,Fault_Vector,Accuracy,Info_Level_1,Test_Result,CLINT_Fault,DMA_Lbl_Fault,DMA_Img_Fault
+0,seu_ph1_17153469_neo_tpu_73.bit,00000000000000000000000200000000,0.01,Match golden fv,Pass,0,0,0

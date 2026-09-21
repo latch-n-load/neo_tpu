@@ -18,13 +18,13 @@ BYTES_PER_WORD = 4
 # --- Campaign Mode Selection ---
 # 1: Target specific Verilog nodes using the .ll file (Diagnostic)
 # 2: Target random routing/LUTs using .ebd set subtraction (Statistical)
-CAMPAIGN_PHASE = 2
+CAMPAIGN_PHASE = 1
 
 # Phase 1 Config
 LL_TARG_NODE = "neo_tpu" # Set node search term
-MAX_PHASE1_TARGS = 2    # Maximum targets to corrupt for specified node
+MAX_PHASE1_TARGS = 200    # Maximum targets to corrupt for specified node
 # Phase 2 Config
-MAX_PHASE2_TARGS = 2    # Number of random routing/LUT bits to attack
+MAX_PHASE2_TARGS = 800    # Number of random routing/LUT bits to attack
 
 def find_sync_word(bit_data):
     """
@@ -305,7 +305,7 @@ def generate_faulty_bitstreams():
             print(f"              {pointer} (Bit Flipped!)")
             
             # 3c. Save the corrupted bitstream
-            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph1_{LL_TARG_NODE}_{i}.bit")
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph1_{target['abs_bit_offset']}_{LL_TARG_NODE}_{i}.bit")
             with open(out_filepath, 'wb') as out_f:
                 out_f.write(faulty_data)
             print(f"Saved to    : {out_filepath}\n")

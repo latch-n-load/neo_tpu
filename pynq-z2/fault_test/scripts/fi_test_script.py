@@ -1,5 +1,6 @@
 import subprocess
 import serial
+import shutil
 import time
 import csv
 import os
@@ -8,7 +9,7 @@ import glob
 
 # --- Configuration ---
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.bit"
-UART_PORT = "/dev/ttyUSB0"      # TODO: Validate UART port
+UART_PORT = "/dev/ttyUSB5"      # TODO: Validate UART port using dmesg -w | grep tty
 BAUD_RATE = 921600
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
 TEST_RESULTS_CSV = "../fault_test_results.csv"
@@ -27,6 +28,7 @@ def program_fpga(bitstream_path):
             ["xsct", PROGRAM_FPGA_TCL, bitstream_path], 
             check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
         )
+        print (f"   {os.path.basename(bitstream_path)} programmed succesfully to FPGA")
         return True
     except subprocess.CalledProcessError as e:
         print(f"[!] XSCT Tool Error:\n{e.stderr.decode('utf-8')}")
@@ -37,14 +39,12 @@ def read_uart_for_fv(ser, golden_fv=None):
     Read UART and categorize result into one of 6 defined states.
     Returns: (extracted_fv_string, result_info, raw_data_string)
     """
-    ser.reset_input_buffer()
     start_time = time.time()
     raw_buffer = b""
     
     while (time.time() - start_time) < TIMEOUT_SEC:
         if ser.in_waiting > 0:
             raw_buffer += ser.read(ser.in_waiting)
-            
             # Attempt to decode and check for the 32-char hex string
             try:
                 decoded = raw_buffer.decode('utf-8', errors='ignore')
@@ -69,9 +69,13 @@ def read_uart_for_fv(ser, golden_fv=None):
     match = FV_REGEX.search(decoded_output)
     if match:
         fv = match.group(1).lower()
+        # print(f"[DEBUG] fv (match.group(1).lower()) = {fv}\n match.group(1) = {match.group(1)} ")
+        # print(f"[DEBUG] golden_fv = {golden_fv} golden_fv.lower() = {golden_fv.lower()} ")
         if golden_fv and fv == golden_fv.lower():
+            # ser.reset_input_buffer()
             return fv, "Match golden fv", decoded_output
         else:
+            # ser.reset_input_buffer()
             return fv, "One or more faults", decoded_output
 
     # 6. Check for No Results (Timeout)
@@ -84,11 +88,14 @@ def read_uart_for_fv(ser, golden_fv=None):
     if (non_ascii_count / len(raw_buffer)) > 0.05:
         # 4 & 5. Infinite vs Finite Garbage
         if len(raw_buffer) > 2000:
+            # ser.reset_input_buffer()
             return None, "Infinite Garbage binary", decoded_output
         else:
+            # ser.reset_input_buffer()
             return None, "Finite Garbage binary", decoded_output
 
     # 3. Missing UART Packets (Text exists, but no complete 32-char hex string)
+    # ser.reset_input_buffer()
     return None, "Missing UART packets", decoded_output
 
 def parse_fv(fv_hex):
@@ -124,12 +131,17 @@ def run_fault_campaign():
     print("==================================================")
     print("             FAULT SIMULATION CAMPAIGN            ")
     print("==================================================")
-    
+
+    # Refersh LOGS_DIR
+    shutil.rmtree(LOGS_DIR, ignore_errors=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
     
     # 1. Open the physical UART port
     try:
-        ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC)
+        ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC) # Create serial object "ser"
+        if ser.is_open:
+            print (f"[*] Opened UART Serial Port")
+            print (f"   Name: {ser.name}, Baudrate: {ser.baudrate}")
     except serial.SerialException as e:
         print(f"[!] Error opening UART: {e}")
         return
@@ -143,7 +155,7 @@ def run_fault_campaign():
     golden_fv, result_info, _ = read_uart_for_fv(ser, golden_fv=None)
     
     if not golden_fv:
-        print(f"[!] FATAL: Could not obtain legible Golden Fault Vector. Info Level: {result_info}")
+        print(f"[!] FATAL: Could not obtain legible Golden Fault Vector. Info: {result_info}")
         return
         
     print(f"[+] Golden Fault Vector obtained: {golden_fv}")
