@@ -21,18 +21,61 @@ PROGRAM_FPGA_TCL = "program_fpga.tcl"
 FV_REGEX = re.compile(r'([0-9a-fA-F]{32})') # Raw String re 32 chars, range 0-9, a-f, A-F
                                     # TODO if error: re.compile(r'^([0-9a-fA-F]{32})$')
 
-def program_fpga(bitstream_path):
-    """Flash the board via XSCT JTAG using TCL script."""
-    try:
-        subprocess.run(
-            ["xsct", PROGRAM_FPGA_TCL, bitstream_path], 
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-        )
-        print (f"   {os.path.basename(bitstream_path)} programmed succesfully to FPGA")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"[!] XSCT Tool Error:\n{e.stderr.decode('utf-8')}")
-        return False
+def start_xsct_session():
+    """Launch XSCT as a persistent background process."""
+    print("[*] Starting XSCT session...")
+    xsct_proc = subprocess.Popen(
+        ["xsct", PROGRAM_FPGA_TCL],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1 # Line buffered
+    )
+    
+    # Wait for the TCL script to print "READY"
+    while True:
+        line = xsct_proc.stdout.readline()
+        if "READY" in line:
+            print("    XSCT connected to hardware and ready!")
+            break
+        if line == "": # EOF means XSCT crashed
+            print("[!] FATAL: XSCT failed to start or crashed.")
+            print("Error output:", xsct_proc.stderr.read())
+            return None
+            
+    return xsct_proc
+
+def program_fpga(xsct_proc, bitstream_path):
+    """Send bitstream path to persistent XSCT and wait for confirmation."""
+    # Write .bit path to XSCT stdin
+    xsct_proc.stdin.write(bitstream_path + "\n")
+    xsct_proc.stdin.flush()
+    
+    # Wait for the success/error token from XSCT's standard output
+    while True:
+        line = xsct_proc.stdout.readline().strip()
+        if line == "PROGRAM_DONE":
+            return True
+        elif "FPGA_PROGRAM_ERROR" in line:
+            print(f"\n[!] {line}")
+            return False
+        elif line == "": # Process died
+            print("\n[!] XSCT process terminated unexpectedly.")
+            return False
+        
+# def program_fpga(bitstream_path):
+#     """Flash the board via XSCT JTAG using TCL script."""
+#     try:
+#         subprocess.run(
+#             ["xsct", PROGRAM_FPGA_TCL, bitstream_path], 
+#             check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+#         )
+#         print (f"   {os.path.basename(bitstream_path)} programmed succesfully to FPGA")
+#         return True
+#     except subprocess.CalledProcessError as e:
+#         print(f"[!] XSCT Tool Error:\n{e.stderr.decode('utf-8')}")
+#         return False
 
 def read_uart_for_fv(ser, golden_fv=None):
     """
@@ -133,10 +176,11 @@ def run_fault_campaign():
     print("==================================================")
 
     # Refersh LOGS_DIR
-    shutil.rmtree(LOGS_DIR, ignore_errors=True)
+    # shutil.rmtree(LOGS_DIR, ignore_errors=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
-    
-    # 1. Open the physical UART port
+
+    # 1. Initialize UART and xsct
+    # 1a. Open the physical UART port
     try:
         ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC) # Create serial object "ser"
         if ser.is_open:
@@ -146,9 +190,14 @@ def run_fault_campaign():
         print(f"[!] Error opening UART: {e}")
         return
 
+    # 1b. Launch XSCT session
+    xsct_proc = start_xsct_session()
+    if not xsct_proc:
+        return
+
     # 2. Extract the Golden Fault Vector
     print("[*] Programming Golden Bitstream to obtain reference FV...")
-    if not program_fpga(GOLDEN_BITSTREAM):
+    if not program_fpga(xsct_proc, GOLDEN_BITSTREAM):
         print("[!] Failed to program golden bitstream. Exiting.")
         return
         
@@ -190,7 +239,7 @@ def run_fault_campaign():
             print(f"\n--- Test {i+1}/{total_tests} : {basename} ---")
             
             # Program the board
-            if not program_fpga(bitstream_file):
+            if not program_fpga(xsct_proc, bitstream_file):
                 result_info = "XSCT Tool Error"
                 fv = None
             else:
@@ -225,7 +274,15 @@ def run_fault_campaign():
             print(f"  Test Result : {test_result}")
             if fv: print(f"  Accuracy    : {acc}")
 
+    # Clean up
     ser.close()
+    try:
+        xsct_proc.stdin.write("EXIT\n")
+        xsct_proc.stdin.flush()
+        xsct_proc.wait(timeout=5)
+    except:
+        xsct_proc.kill()
+        
     print("\n==================================================")
     print(f"Campaign Complete. Results saved to {TEST_RESULTS_CSV}")
     print(f"Individual logs saved in {LOGS_DIR}/")
