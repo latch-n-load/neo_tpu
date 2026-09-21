@@ -14,7 +14,7 @@ BAUD_RATE = 921600
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
 TEST_RESULTS_CSV = "../fault_test_results.csv"
 LOGS_DIR = "../logs"            # Directory to store individual run logs
-TIMEOUT_SEC = 30                # 30-second timeout
+TIMEOUT_SEC = 5                # 30-second timeout
 PROGRAM_FPGA_TCL = "program_fpga.tcl"
 
 # Regex to capture exactly 32 hex characters
@@ -36,12 +36,17 @@ def start_xsct_session():
     # Wait for the TCL script to print "READY"
     while True:
         line = xsct_proc.stdout.readline()
+        
+        # --- DEBUG PRINT ---
+        if line:
+            print(f"[XSCT INIT] {line.strip()}")
+
         if "READY" in line:
             print("    XSCT connected to hardware and ready!")
             break
         if line == "": # EOF means XSCT crashed
             print("[!] FATAL: XSCT failed to start or crashed.")
-            print("Error output:", xsct_proc.stderr.read())
+            print("\n[XSCT CRASH LOG]:\n", xsct_proc.stderr.read())
             return None
             
     return xsct_proc
@@ -54,14 +59,27 @@ def program_fpga(xsct_proc, bitstream_path):
     
     # Wait for the success/error token from XSCT's standard output
     while True:
-        line = xsct_proc.stdout.readline().strip()
-        if line == "PROGRAM_DONE":
+        line = xsct_proc.stdout.readline()
+        
+        # --- DEBUG PRINT ---
+        # This will print every single `puts` from your TCL script to your terminal
+        if line:
+            print(f"  [XSCT] {line.strip()}")
+            
+        clean_line = line.strip()
+        
+        if clean_line == "PROGRAM_DONE":
             return True
-        elif "FPGA_PROGRAM_ERROR" in line:
-            print(f"\n[!] {line}")
+        elif "FPGA_PROGRAM_ERROR" in clean_line:
             return False
         elif line == "": # Process died
             print("\n[!] XSCT process terminated unexpectedly.")
+            
+            # Pull any fatal crash logs from stderr
+            error_output = xsct_proc.stderr.read()
+            if error_output:
+                print(f"\n[XSCT CRASH LOG]:\n{error_output}")
+                
             return False
         
 # def program_fpga(bitstream_path):
@@ -270,7 +288,7 @@ def run_fault_campaign():
             log_filename = os.path.join(LOGS_DIR, f"log_{basename}.txt")
             generate_log_file(log_filename, basename, fv, test_result)
             
-            print(f"  Info Level  : {result_info}")
+            print(f"  Result Info : {result_info}")
             print(f"  Test Result : {test_result}")
             if fv: print(f"  Accuracy    : {acc}")
 

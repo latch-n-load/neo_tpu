@@ -2,7 +2,6 @@
 # and programs PYNQ-Z2 board using XSCT
 
 connect
-puts "xsct% Connected to hardware server"
 # TODO check if name matches FPGA
 # Example
 # 1  Xilinx HW-USB-II-G 0000185e495201
@@ -21,6 +20,7 @@ flush stdout
 while {1} {
     # Wait for Python to send a bitstream path over stdin
     set bitstream_file [gets stdin]
+    puts "Received .bit $bitstream_file"
 
     # Allow Python to cleanly close the session
     if {$bitstream_file == "EXIT"} {
@@ -33,7 +33,7 @@ while {1} {
     }
 
     # Program the FPGA with error stdout
-    if { [catch {fpga -file $bitstream_file} result] }
+    if { [catch {fpga -file $bitstream_file} result] } {
         puts "FPGA_PROGRAM_ERROR: Failed to push bitstream. Reason: $result"
         flush stdout
         continue
