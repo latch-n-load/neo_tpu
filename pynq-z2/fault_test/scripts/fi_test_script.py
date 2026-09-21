@@ -14,8 +14,9 @@ BAUD_RATE = 921600
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
 TEST_RESULTS_CSV = "../fault_test_results.csv"
 LOGS_DIR = "../logs"            # Directory to store individual run logs
-TIMEOUT_SEC = 5                # 30-second timeout
+TIMEOUT_SEC = 5                 # Wait for UART response
 PROGRAM_FPGA_TCL = "program_fpga.tcl"
+IMAGE_COUNT = 100
 
 # Regex to capture exactly 32 hex characters
 FV_REGEX = re.compile(r'([0-9a-fA-F]{32})') # Raw String re 32 chars, range 0-9, a-f, A-F
@@ -171,12 +172,12 @@ def parse_fv(fv_hex):
     dma_lbl_fault = (val >> 126) & 1
     dma_img_fault = (val >> 125) & 1
     
-    # Extract 100 LSBs for image classification tracking
-    lsb_100 = val & ((1 << 100) - 1)
-    mismatches = bin(lsb_100).count('1')
+    # Extract IMAGE_COUNT LSBs for image classification tracking
+    img_faults = val & ((1 << IMAGE_COUNT) - 1)
+    mismatches = bin(img_faults).count('1')
     
-    # As requested: "accuracy % = number of 1s in fv (100LSB) / 100"
-    accuracy_metric = mismatches / 100.0
+    # accuracy % = Image_count - number of 1s in fv (100LSB) / Image_count
+    accuracy_metric =  (IMAGE_COUNT - mismatches) / IMAGE_COUNT
     
     return accuracy_metric, clint_fault, dma_lbl_fault, dma_img_fault
 
@@ -225,7 +226,7 @@ def run_fault_campaign():
         print(f"[!] FATAL: Could not obtain legible Golden Fault Vector. Info: {result_info}")
         return
         
-    print(f"[+] Golden Fault Vector obtained: {golden_fv}")
+    print(f"    Golden Fault Vector obtained: {golden_fv}")
 
     # 3. Discover Corrupt Bitstreams
     corrupt_files = glob.glob(os.path.join(CORRUPT_BITSTREAMS_DIR, "*.bit"))
@@ -244,7 +245,7 @@ def run_fault_campaign():
             'Corrupt_bitstream_filename', 
             'Fault_Vector', 
             'Accuracy', 
-            'Info_Level_1', 
+            'Result_Info', 
             'Test_Result',
             'CLINT_Fault',
             'DMA_Lbl_Fault',
@@ -275,7 +276,7 @@ def run_fault_campaign():
             
             # Write Summary CSV
             writer.writerow([
-                i, 
+                i+1, 
                 basename, 
                 fv if fv else "NONE", 
                 acc, 

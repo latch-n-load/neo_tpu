@@ -22,9 +22,9 @@ CAMPAIGN_PHASE = 1
 
 # Phase 1 Config
 LL_TARG_NODE = "neo_tpu" # Set node search term
-MAX_PHASE1_TARGS = 200    # Maximum targets to corrupt for specified node
+MAX_PHASE1_TARGS = 1000    # Maximum targets to corrupt for specified node
 # Phase 2 Config
-MAX_PHASE2_TARGS = 800    # Number of random routing/LUT bits to attack
+MAX_PHASE2_TARGS = 9000    # Number of random routing/LUT bits to attack
 
 def find_sync_word(bit_data):
     """
