@@ -4,7 +4,7 @@ import re
 # --- Configuration ---
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq/neo_tpu_pynq.runs/impl_1/neo_tpu_pynq_wrapper.bit"  
 LL_FILE = "/home/a_akif/tesi/neo_tpu_pynq/neo_tpu_pynq.runs/impl_1/neo_tpu_pynq_wrapper.ll"            
-CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
+CORRUPT_BITSTREAMS_DIR = "../../corrupt_bit"
 
 # Zynq-7000 / Artix-7 Specific Parameters
 SYNC_WORD = b'\xAA\x99\x55\x66' 
