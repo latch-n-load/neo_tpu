@@ -1,3 +1,5 @@
+# Script for parsing ll files locate and corrupt multiple instance of TARGET_NODE, and generate
+# 1 .bit file with all bit flips.
 import os
 import re
 
