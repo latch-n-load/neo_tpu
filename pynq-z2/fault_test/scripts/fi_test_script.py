@@ -182,10 +182,10 @@ def parse_fv(fv_hex):
     return accuracy_metric, clint_fault, dma_lbl_fault, dma_img_fault
 
 def generate_log_file(filename, bitstream, fv, status):
-    """Generates an individual log file for a specific corrupt bitstream run."""
+    """Generate an individual log file for each corrupt bitstream run."""
     with open(filename, 'w') as f:
-        f.write(f"Corrupt_bitstream_filename: {bitstream}\n")
-        f.write(f"Fault vector obtained from FPGA: {fv if fv else 'NONE'}\n")
+        f.write(f"Corrupt_bit_file: {bitstream}\n")
+        f.write(f"Fault vector from FPGA: {fv if fv else 'NONE'}\n")
         f.write(f"Test result: {status}\n")
 
 def run_fault_campaign():
@@ -195,7 +195,7 @@ def run_fault_campaign():
     print("==================================================")
 
     # Refersh LOGS_DIR
-    # shutil.rmtree(LOGS_DIR, ignore_errors=True)
+    shutil.rmtree(LOGS_DIR, ignore_errors=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     # 1. Initialize UART and xsct
@@ -286,7 +286,7 @@ def run_fault_campaign():
             ])
             
             # Write Individual Log
-            log_filename = os.path.join(LOGS_DIR, f"log_{basename}.txt")
+            log_filename = os.path.join(LOGS_DIR, f"log_{basename}.log")
             generate_log_file(log_filename, basename, fv, test_result)
             
             print(f"  Result Info : {result_info}")
