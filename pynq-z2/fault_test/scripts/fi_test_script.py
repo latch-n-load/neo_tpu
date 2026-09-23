@@ -9,7 +9,7 @@ import glob
 
 # --- Configuration ---
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.bit"
-UART_PORT = "/dev/ttyUSB5"      # TODO: Validate UART port using dmesg -w | grep tty
+UART_PORT = "/dev/ttyUSB0"      # TODO: Validate UART port using sudo dmesg -w | grep tty
 BAUD_RATE = 921600
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
 TEST_RESULTS_CSV = "../fault_test_results.csv"
@@ -126,39 +126,58 @@ def read_uart_for_fv(ser, golden_fv=None):
         time.sleep(0.01)
 
     decoded_output = raw_buffer.decode('utf-8', errors='ignore')
+    # Create a legible version of raw binary using replacement character
+    legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
 
-    # Check for Legible Fault Vector
+    # 1. Check for Legible Fault Vector
     match = FV_REGEX.search(decoded_output)
     if match:
-        fv = match.group(1).lower()
+        fv = match.group(1).lower() # Convert group 1 to lower case and assign as fv
         # print(f"[DEBUG] fv (match.group(1).lower()) = {fv}\n match.group(1) = {match.group(1)} ")
         # print(f"[DEBUG] golden_fv = {golden_fv} golden_fv.lower() = {golden_fv.lower()} ")
+        # 1a. If fv == golden
         if golden_fv and fv == golden_fv.lower():
             # ser.reset_input_buffer()
             return fv, "Match golden fv", decoded_output
+        # 1b. if fv is false perfectly (all zeroes)
+        elif fv == "00000000000000000000000000000000" and golden_fv != "00000000000000000000000000000000":
+            return fv, "False Perfect FV", decoded_output
         else:
             # ser.reset_input_buffer()
             return fv, "One or more faults", decoded_output
 
-    # 6. Check for No Results (Timeout)
+    # 2. Check for No Results (Timeout)
     if len(raw_buffer) == 0:
         return None, "No results obtained", decoded_output
 
-    # Check for Binary Garbage
+    # 3. Check for Binary Garbage
     # Heuristic: If more than 5% of characters are outside standard printable ASCII ranges
     non_ascii_count = sum(1 for b in raw_buffer if b > 127 or b < 8)
     if (non_ascii_count / len(raw_buffer)) > 0.05:
         # 4 & 5. Infinite vs Finite Garbage
         if len(raw_buffer) > 2000:
             # ser.reset_input_buffer()
-            return None, "Infinite Garbage binary", decoded_output
+            return legible_binary, "Infinite Garbage binary", decoded_output
         else:
             # ser.reset_input_buffer()
-            return None, "Finite Garbage binary", decoded_output
+            return legible_binary, "Finite Garbage binary", decoded_output
 
-    # 3. Missing UART Packets (Text exists, but no complete 32-char hex string)
+    # 4. Check for Hardware Exceptions / Crashes
+    lower_out = decoded_output.lower()
+    if "[cpu" in lower_out or "neov32" in lower_out or "access fault" in lower_out:
+        # Extract the first meaningful line of the error
+        first_error_line = "Unknown CPU Exception"
+        for line in decoded_output.splitlines():
+            clean_line = line.strip()
+            # Grab the first line that looks like a CPU error log
+            if "[cpu" in clean_line.lower() or "neorv32" in clean_line.lower() or "fault" in clean_line.lower():
+                first_error_line = clean_line
+                break
+        return first_error_line, "Hardware Exception", decoded_output
+
+    # 5. Missing UART Packets (Text exists, but no complete 32-char hex string)
     # ser.reset_input_buffer()
-    return None, "Missing UART packets", decoded_output
+    return decoded_output.strip(), "Missing UART packets", decoded_output
 
 def parse_fv(fv_hex):
     """
@@ -194,12 +213,12 @@ def run_fault_campaign():
     print("             FAULT SIMULATION CAMPAIGN            ")
     print("==================================================")
 
-    # Refersh LOGS_DIR
+    # Refresh LOGS_DIR
     shutil.rmtree(LOGS_DIR, ignore_errors=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     # 1. Initialize UART and xsct
-    # 1a. Open the physical UART port
+    # 1a. Open UART port
     try:
         ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC) # Create serial object "ser"
         if ser.is_open:
@@ -269,10 +288,14 @@ def run_fault_campaign():
             acc, clint, dma_lbl, dma_img = ("N/A", "N/A", "N/A", "N/A")
             test_result = "Fail" # Default to Fail for crashes/garbage
             
-            if fv:
+            # Parse FV if it was categorized as a valid hex string match
+            if fv and result_info in ["Match golden fv", "One or more faults"]:
                 acc, clint, dma_lbl, dma_img = parse_fv(fv)
                 # Define Pass as an exact match to Golden FV. Any data corruption or crash is a Fail.
                 test_result = "Pass" if (result_info == "Match golden fv") else "Fail"
+            # FV contains garbage data or partial text; leave hardware faults as "N/A"
+            elif fv:
+                test_result = "Fail"
             
             # Write Summary CSV
             writer.writerow([
