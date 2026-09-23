@@ -297,11 +297,13 @@ def run_fault_campaign():
             elif fv:
                 test_result = "Fail"
             
+            repr_fv = repr(fv) if fv else "NONE" # Representative symbols in case of raw binary fv
+            
             # Write Summary CSV
             writer.writerow([
                 i+1, 
                 basename, 
-                fv if fv else "NONE", 
+                repr_fv if repr_fv else "NONE", 
                 acc, 
                 result_info, 
                 test_result,
@@ -310,7 +312,7 @@ def run_fault_campaign():
             
             # Write Individual Log
             log_filename = os.path.join(LOGS_DIR, f"log_{basename}.log")
-            generate_log_file(log_filename, basename, fv, test_result)
+            generate_log_file(log_filename, basename, repr_fv, test_result)
             
             print(f"  Result Info : {result_info}")
             print(f"  Test Result : {test_result}")
