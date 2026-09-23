@@ -1,3 +1,4 @@
 # Ale
 /pynq-z2/fault_test/corrupt_bit
 /pynq-z2/fault_test/logs
+/pynq-z2/fault_test/fault_test_results.csv
