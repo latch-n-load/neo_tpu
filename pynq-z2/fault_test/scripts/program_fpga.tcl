@@ -10,7 +10,7 @@ connect
 #   4  Digilent JTAG-SMT2 210279A42321
 #      5  arm_dap (idcode: 4ba00477)
 #      6  xc7z020 (idcode: 23727093)      <-- (My XC7Z020!)
-targets -set -filter {name =~ "xc7z020*"}
+targets -set -filter {name =~ "xc7z020"}
 
 # Signal to Python that initialization is complete
 puts "READY"
