@@ -18,13 +18,16 @@ BYTES_PER_WORD = 4
 # --- Campaign Mode Selection ---
 # 1: Target specific Verilog nodes using the .ll file (Diagnostic)
 # 2: Target random routing/LUTs using .ebd set subtraction (Statistical)
-CAMPAIGN_PHASE = 1
+# 3: Target random completely unused FDRI payload bits (Negative Testing/Control)
+CAMPAIGN_PHASE = 3
 
 # Phase 1 Config
 LL_TARG_NODE = "neo_tpu" # Set node search term
 MAX_PHASE1_TARGS = 1000    # Maximum targets to corrupt for specified node
 # Phase 2 Config
 MAX_PHASE2_TARGS = 9000    # Number of random routing/LUT bits to attack
+# Phase 3 Config
+MAX_PHASE3_TARGS = 1000    # Number of random unused FDRI bits to attack
 
 def find_sync_word(bit_data):
     """
@@ -207,10 +210,10 @@ def get_fdri_data_start(bit_data):
     fdri_data_start = match.start() + 8
     print(f"    Bitstream design payload begins at .bit offset: {fdri_data_start} (0x{fdri_data_start:08X})")
     word_count = start_fdri_word & 0x0FFFFFFF
-    print(f"    Total bitstream payload in .bit: {word_count * BYTES_PER_WORD * 8} bits")
+    total_payload_bits = word_count * BYTES_PER_WORD * 8
+    print(f"    Total bitstream payload in .bit: {total_payload_bits} bits")
 
-    
-    return fdri_data_start
+    return fdri_data_start, total_payload_bits
 
 def flip_bit_in_bytearray(data_array, abs_bit_offset, raw_data_start):
     """
@@ -261,9 +264,9 @@ def generate_faulty_bitstreams():
     # Sanity Check
     if find_sync_word(golden_data) == -1: return
 
-    # 1b. Find where the raw data starts
-    fdri_data_start = get_fdri_data_start(golden_data)
-    if fdri_data_start == -1:
+    # 1b. Find where the raw data starts & get total payload size
+    fdri_data_start, total_payload_bits = get_fdri_data_start(golden_data)
+    if fdri_data_start == -1: 
         return
 
     # 2a. Analyze .ll to get ranges
@@ -284,10 +287,10 @@ def generate_faulty_bitstreams():
         print("[*] Commencing Targeted Bit Flips...\n")
         
         for i, target in enumerate(injection_targets):
-            print(f"--- Injection #{i} ---")
-            print(f"Target Node : {target['info']}")
-            print(f"Frame Addr  : {target['frame_addr']} | Frame Offset: {target['frame_offset']}")
-            print(f"Abs Bit Idx : {target['abs_bit_offset']}")
+            # print(f"--- Injection #{i} ---")
+            # print(f"Target Node : {target['info']}")
+            # print(f"Frame Addr  : {target['frame_addr']} | Frame Offset: {target['frame_offset']}")
+            # print(f"Abs Bit Idx : {target['abs_bit_offset']}")
 
             # 3b. Fire Faults
             faulty_data = bytearray(golden_data) # Make a copy of the golden bitstream
@@ -295,24 +298,24 @@ def generate_faulty_bitstreams():
                 faulty_data, target['abs_bit_offset'], fdri_data_start
             )
             
-            # Verify the flip visually
-            print(f"File Offset : Byte {byte_idx}, Bit {bit_in_byte}")
-            print(f"Verification: Original Byte -> {orig_bin}")
-            print(f"              Corrupt Byte  -> {corr_bin}")
+            # # Verify the flip visually
+            # print(f"File Offset : Byte {byte_idx}, Bit {bit_in_byte}")
+            # print(f"Verification: Original Byte -> {orig_bin}")
+            # print(f"              Corrupt Byte  -> {corr_bin}")
             
-            # Highlight which bit flipped
-            pointer = " " * (17 + bit_in_byte) + "^"
-            print(f"              {pointer} (Bit Flipped!)")
+            # # Highlight which bit flipped
+            # pointer = " " * (17 + bit_in_byte) + "^"
+            # print(f"              {pointer} (Bit Flipped!)")
             
             # 3c. Save the corrupted bitstream
-            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph1_{target['abs_bit_offset']}_{LL_TARG_NODE}_{i}.bit")
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph1_{i}_{LL_TARG_NODE}_{target['abs_bit_offset']}.bit")
             with open(out_filepath, 'wb') as out_f:
                 out_f.write(faulty_data)
-            print(f"Saved to    : {out_filepath}\n")
+            print(f"  Saved : {out_filepath}")
             
         print(f"[*] Successfully generated {len(injection_targets)} corrupted bitstreams.")
 
-    # PHASE 2: ROUTING, LUT and DSP CAMPAIGN
+    # PHASE 2: ROUTING, LUT and DSP CAMPAIGN (.ebd - .ll)
     # ---------------------------------------------------------
     elif CAMPAIGN_PHASE == 2:
         print(f"\n[PHASE 2] Executing Routing, LUT and DSP Structural Fault Injection Campaign")
@@ -341,12 +344,53 @@ def generate_faulty_bitstreams():
             faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
                 faulty_data, abs_offset, fdri_data_start
             )
-            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph2_{abs_offset}_{i}.bit")
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph2_{i}_{abs_offset}.bit")
             with open(out_filepath, 'wb') as out_f:
                 out_f.write(faulty_data)
             print(f"  Saved : {out_filepath}")
             
         print(f"[*] Successfully generated {sample_targs} Phase 2 bitstreams.")
+
+    # PHASE 3: RANDOM UNCORRUPTED BITS (FDRI Universe - .ebd - .ll)
+    # ---------------------------------------------------------------------------------------------------
+    elif CAMPAIGN_PHASE == 3:
+        print(f"\n[PHASE 3] Executing Random FDRI Payload Campaign")
+        ebd_bits = get_essential_bits(EBD_FILE)
+        ll_bits = get_all_ll_bits(LL_FILE)
+        
+        if not ebd_bits or not ll_bits:
+            print("[!] Missing necessary .ebd or .ll data. Exiting.")
+            return
+
+        # Combine all mapped structural and logical active bits
+        excluded_bits = ebd_bits.union(ll_bits)
+        print(f"[*] Total bits excluded from PHASE 3: {len(excluded_bits)} bits")
+        
+        # Memory-efficient random sampling loop
+        valid_samples = []
+        print(f"[*] Finding {MAX_PHASE3_TARGS} unused random targets...")
+        
+        while len(valid_samples) < MAX_PHASE3_TARGS:
+            # Generate a random bit within the total payload universe
+            candidate = random.randint(0, total_payload_bits - 1)
+            
+            # Ensure it is not excluded_bits and not picked in PHASE 3
+            if candidate not in excluded_bits and candidate not in valid_samples:
+                valid_samples.append(candidate)
+                
+        print(f"[*] Commencing Bit Flips for {MAX_PHASE3_TARGS} random unused targets...\n")
+        
+        for i, abs_offset in enumerate(valid_samples):
+            faulty_data = bytearray(golden_data)
+            faulty_data, byte_idx, bit_in_byte, orig_bin, corr_bin = flip_bit_in_bytearray(
+                faulty_data, abs_offset, fdri_data_start
+            )
+            out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph3_{i}_{abs_offset}.bit")
+            with open(out_filepath, 'wb') as out_f:
+                out_f.write(faulty_data)
+            print(f"  Saved : {out_filepath}")
+            
+        print(f"[*] Successfully generated {len(valid_samples)} Phase 3 bitstreams.")
 
     else: print("[!] Invalid CAMPAIGN_PHASE selected.")
     end_time = time.time()
