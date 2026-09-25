@@ -12,7 +12,7 @@ GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/ne
 UART_PORT = "/dev/ttyUSB0"      # TODO: Validate UART port using sudo dmesg -w | grep tty
 BAUD_RATE = 921600
 CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
-TEST_RESULTS_CSV = "../fault_test_results.csv"
+TEST_RESULTS_CSV = "../fi_test_results.csv"
 LOGS_DIR = "../logs"            # Directory to store individual run logs
 TIMEOUT_SEC = 5                 # Wait for UART response
 PROGRAM_FPGA_TCL = "program_fpga.tcl"
@@ -20,7 +20,6 @@ IMAGE_COUNT = 100
 
 # Regex to capture exactly 32 hex characters
 FV_REGEX = re.compile(r'([0-9a-fA-F]{32})') # Raw String re 32 chars, range 0-9, a-f, A-F
-                                    # TODO if error: re.compile(r'^([0-9a-fA-F]{32})$')
 
 def start_xsct_session():
     """Launch XSCT as a persistent background process."""
@@ -83,23 +82,16 @@ def program_fpga(xsct_proc, bitstream_path):
                 
             return False
         
-# def program_fpga(bitstream_path):
-#     """Flash the board via XSCT JTAG using TCL script."""
-#     try:
-#         subprocess.run(
-#             ["xsct", PROGRAM_FPGA_TCL, bitstream_path], 
-#             check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
-#         )
-#         print (f"   {os.path.basename(bitstream_path)} programmed succesfully to FPGA")
-#         return True
-#     except subprocess.CalledProcessError as e:
-#         print(f"[!] XSCT Tool Error:\n{e.stderr.decode('utf-8')}")
-#         return False
-
 def read_uart_for_fv(ser, golden_fv=None):
     """
-    Read UART and categorize result into one of 6 defined states.
-    Returns: (extracted_fv_string, result_info, raw_data_string)
+    Read UART and categorize result into one of the following result_info categories:
+    1. Matches Golden FV
+    2. False Perfect FV
+    3. One or more faults
+    4. No result obtained
+    5. Hardware Exception
+    6. Invalid UART Payload (Truncated FV or Illegible binary) 
+    Returns: (extracted_fv_string, result_info)
     """
     start_time = time.time()
     raw_buffer = b""
@@ -127,7 +119,7 @@ def read_uart_for_fv(ser, golden_fv=None):
 
     decoded_output = raw_buffer.decode('utf-8', errors='ignore')
     # Create a legible version of raw binary using replacement character
-    legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
+    # legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
 
     # 1. Check for Legible Fault Vector
     match = FV_REGEX.search(decoded_output)
@@ -136,33 +128,27 @@ def read_uart_for_fv(ser, golden_fv=None):
         # print(f"[DEBUG] fv (match.group(1).lower()) = {fv}\n match.group(1) = {match.group(1)} ")
         # print(f"[DEBUG] golden_fv = {golden_fv} golden_fv.lower() = {golden_fv.lower()} ")
         # 1a. If fv == golden
-        if golden_fv and fv == golden_fv.lower():
+        if golden_fv is None:
             # ser.reset_input_buffer()
-            return fv, "Match golden fv", decoded_output
+            return fv, "Golden FV Extracted"
+        elif fv == golden_fv.lower():
+            # ser.reset_input_buffer()
+            return fv, "Matches Golden FV"
         # 1b. if fv is false perfectly (all zeroes)
         elif fv == "00000000000000000000000000000000" and golden_fv != "00000000000000000000000000000000":
-            return fv, "False Perfect FV", decoded_output
+            # ser.reset_input_buffer()
+            return fv, "False Perfect FV"
+        # 1c. Mismatch between fv and golden_fv
         else:
             # ser.reset_input_buffer()
-            return fv, "One or more faults", decoded_output
+            return fv, "One or more faults"
 
     # 2. Check for No Results (Timeout)
     if len(raw_buffer) == 0:
-        return None, "No results obtained", decoded_output
+        # ser.reset_input_buffer()
+        return None, "No result obtained"
 
-    # 3. Check for Binary Garbage
-    # Heuristic: If more than 5% of characters are outside standard printable ASCII ranges
-    non_ascii_count = sum(1 for b in raw_buffer if b > 127 or b < 8)
-    if (non_ascii_count / len(raw_buffer)) > 0.05:
-        # 4 & 5. Infinite vs Finite Garbage
-        if len(raw_buffer) > 2000:
-            # ser.reset_input_buffer()
-            return legible_binary, "Infinite Garbage binary", decoded_output
-        else:
-            # ser.reset_input_buffer()
-            return legible_binary, "Finite Garbage binary", decoded_output
-
-    # 4. Check for Hardware Exceptions / Crashes
+    # 3. Check for Hardware Exceptions / Crashes
     lower_out = decoded_output.lower()
     if "[cpu" in lower_out or "neov32" in lower_out or "access fault" in lower_out:
         # Extract the first meaningful line of the error
@@ -173,11 +159,12 @@ def read_uart_for_fv(ser, golden_fv=None):
             if "[cpu" in clean_line.lower() or "neorv32" in clean_line.lower() or "fault" in clean_line.lower():
                 first_error_line = clean_line
                 break
-        return first_error_line, "Hardware Exception", decoded_output
+        # ser.reset_input_buffer()
+        return first_error_line, "Hardware Exception"
 
-    # 5. Missing UART Packets (Text exists, but no complete 32-char hex string)
+    # 6. Invalid UART Payload (Truncated FV or Illegible binary) 
     # ser.reset_input_buffer()
-    return decoded_output.strip(), "Missing UART packets", decoded_output
+    return decoded_output, "Invalid UART Payload"
 
 def parse_fv(fv_hex):
     """
@@ -214,7 +201,7 @@ def run_fault_campaign():
     print("==================================================")
 
     # Refresh LOGS_DIR
-    shutil.rmtree(LOGS_DIR, ignore_errors=True)
+    # shutil.rmtree(LOGS_DIR, ignore_errors=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     # 1. Initialize UART and xsct
@@ -239,7 +226,7 @@ def run_fault_campaign():
         print("[!] Failed to program golden bitstream. Exiting.")
         return
         
-    golden_fv, result_info, _ = read_uart_for_fv(ser, golden_fv=None)
+    golden_fv, result_info = read_uart_for_fv(ser, golden_fv=None)
     
     if not golden_fv:
         print(f"[!] FATAL: Could not obtain legible Golden Fault Vector. Info: {result_info}")
@@ -281,18 +268,18 @@ def run_fault_campaign():
                 result_info = "XSCT Tool Error"
                 fv = None
             else:
-                # Read UART using the 6-state logic
-                fv, result_info, raw_out = read_uart_for_fv(ser, golden_fv)
+                # Read UART and assign fault category
+                fv, result_info = read_uart_for_fv(ser, golden_fv)
 
-            # Analyze valid vectors
+            # Analyze valid fv
             acc, clint, dma_lbl, dma_img = ("N/A", "N/A", "N/A", "N/A")
             test_result = "Fail" # Default to Fail for crashes/garbage
             
             # Parse FV if it was categorized as a valid hex string match
-            if fv and result_info in ["Match golden fv", "One or more faults"]:
+            if fv and result_info in ["Matches Golden FV", "One or more faults"]:
                 acc, clint, dma_lbl, dma_img = parse_fv(fv)
-                # Define Pass as an exact match to Golden FV. Any data corruption or crash is a Fail.
-                test_result = "Pass" if (result_info == "Match golden fv") else "Fail"
+                # Define Pass as a match with Golden FV. Any data corruption or crash is a Fail.
+                test_result = "Pass" if (result_info == "Matches Golden FV") else "Fail"
             # FV contains garbage data or partial text; leave hardware faults as "N/A"
             elif fv:
                 test_result = "Fail"
@@ -316,7 +303,7 @@ def run_fault_campaign():
             
             print(f"  Result Info : {result_info}")
             print(f"  Test Result : {test_result}")
-            if fv: print(f"  Accuracy    : {acc}")
+            if fv and acc != "N/A": print(f"  Accuracy    : {acc}")
 
     # Clean up
     ser.close()
@@ -330,7 +317,7 @@ def run_fault_campaign():
     print("\n==================================================")
     print(f"Campaign Complete. Results saved to {TEST_RESULTS_CSV}")
     print(f"Individual logs saved in {LOGS_DIR}/")
-    print(f"Total Time: {time.time() - st_time:.2f} seconds")
+    print(f"Total Time: {(time.time() - st_time)/60:.2f} minutes")
 
 if __name__ == "__main__":
     run_fault_campaign()
