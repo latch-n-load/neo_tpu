@@ -9,9 +9,9 @@ import glob
 
 # --- Configuration ---
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.bit"
-UART_PORT = "/dev/ttyUSB0"      # TODO: Validate UART port using sudo dmesg -w | grep tty
+UART_PORT = "/dev/ttyUSB11"      # TODO: Validate UART port using sudo dmesg -w | grep tty
 BAUD_RATE = 921600
-CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
+CORRUPT_BITSTREAMS_DIR = "../ph2_corrupt_bit"
 TEST_RESULTS_CSV = "../fi_test_results.csv"
 LOGS_DIR = "../logs"            # Directory to store individual run logs
 TIMEOUT_SEC = 5                 # Wait for UART response
@@ -26,9 +26,9 @@ def start_xsct_session():
     print("[*] Starting XSCT session...")
     xsct_proc = subprocess.Popen(
         ["xsct", PROGRAM_FPGA_TCL],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdin=subprocess.PIPE, # Get input
+        stdout=subprocess.PIPE, # Get output
+        stderr=subprocess.PIPE, # Get errors
         text=True,
         bufsize=1 # Line buffered
     )
@@ -62,7 +62,7 @@ def program_fpga(xsct_proc, bitstream_path):
         line = xsct_proc.stdout.readline()
         
         # --- DEBUG PRINT ---
-        # This will print every single `puts` from your TCL script to your terminal
+        # Print every puts from TCL script to terminal
         if line:
             print(f"  [XSCT] {line.strip()}")
             
@@ -88,7 +88,7 @@ def read_uart_for_fv(ser, golden_fv=None):
     1. Matches Golden FV
     2. False Perfect FV
     3. One or more faults
-    4. No result obtained
+    4. No result obtained (Timeout)
     5. Hardware Exception
     6. Invalid UART Payload (Truncated FV or Illegible binary) 
     Returns: (extracted_fv_string, result_info)
@@ -117,7 +117,7 @@ def read_uart_for_fv(ser, golden_fv=None):
                 
         time.sleep(0.01)
 
-    decoded_output = raw_buffer.decode('utf-8', errors='ignore')
+    decoded_output = raw_buffer.decode('utf-8', errors='replace')
     # Create a legible version of raw binary using replacement character
     # legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
 
@@ -210,7 +210,7 @@ def run_fault_campaign():
         ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC) # Create serial object "ser"
         if ser.is_open:
             print (f"[*] Opened UART Serial Port")
-            print (f"   Name: {ser.name}, Baudrate: {ser.baudrate}")
+            print (f"    Name: {ser.name}, Baudrate: {ser.baudrate}")
     except serial.SerialException as e:
         print(f"[!] Error opening UART: {e}")
         return
@@ -271,7 +271,7 @@ def run_fault_campaign():
                 # Read UART and assign fault category
                 fv, result_info = read_uart_for_fv(ser, golden_fv)
 
-            # Analyze valid fv
+            # Analyze VALID FV only
             acc, clint, dma_lbl, dma_img = ("N/A", "N/A", "N/A", "N/A")
             test_result = "Fail" # Default to Fail for crashes/garbage
             
@@ -283,8 +283,9 @@ def run_fault_campaign():
             # FV contains garbage data or partial text; leave hardware faults as "N/A"
             elif fv:
                 test_result = "Fail"
-            
-            repr_fv = repr(fv) if fv else "NONE" # Representative symbols in case of raw binary fv
+
+            # Convert to representative symbols in case of raw binary fv
+            repr_fv = repr(fv) if fv else "NONE"
             
             # Write Summary CSV
             writer.writerow([
