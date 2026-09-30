@@ -5,23 +5,23 @@ import re
 import random
 
 # --- Configuration ---
-GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.bit"
-LL_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ll"
-EBD_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ebd" 
-CORRUPT_BITSTREAMS_DIR = "../corrupt_bit"
+GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.bit"
+LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ll"
+EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ebd" 
 
 # --- Campaign Mode Selection ---
 # 1: Target specific Verilog nodes using the .ll file (Precision Diagnostic)
 # 2: Target phase 1 untested bits using .ebd (Essential bits)
 # 3: Target phase 1 & phase 2 untested bits corrupting .bit directly (Full CRAM coverage)
-CAMPAIGN_PHASE = 3
+CAMPAIGN_PHASE = 2
+CORRUPT_BITSTREAMS_DIR = f"../ph{CAMPAIGN_PHASE}_corrupt_bit"
 # Phase 1 Config
-LL_TARG_NODE = "neo_tpu" # Set node search term
-MAX_PHASE1_TARGS = 1000    # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
+LL_TARG_NODE = "neorv32_cfs_inst" # Set node search term
+MAX_PHASE1_TARGS = 6000    # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
 # Phase 2 Config
-MAX_PHASE2_TARGS = 3000    # Maximum targets of essential bits extracted from .ebd corrupted in .bit
+MAX_PHASE2_TARGS = 10000    # Maximum targets of essential bits extracted from .ebd corrupted in .bit
 # Phase 3 Config
-MAX_PHASE3_TARGS = 6000    # Maximum targets of untested bits corrupted directly in .bit
+MAX_PHASE3_TARGS = 10000    # Maximum targets of untested bits corrupted directly in .bit
 
 # Zynq-7000 / Artix-7 Specific Parameters
 SYNC_WORD = b'\xAA\x99\x55\x66' # 0xAA995566
@@ -168,7 +168,7 @@ def get_essential_bits(ebd_filepath):
                 clean_line = line.strip()
                 ebd_match = ebd_regex.match(clean_line)
                 if ebd_match:
-                    print(f"[*] Total bits (essential + non-essential) in .ebd file: {ebd_match.group(1)} bits")
+                    print(f"    Total bits (essential + non-essential) in .ebd file: {ebd_match.group(1)} bits")
                 # Skip text header, grab the continuous string of 1s and 0s
                 if clean_line.startswith('0') or clean_line.startswith('1'):
                     ebd_data += clean_line
@@ -178,7 +178,7 @@ def get_essential_bits(ebd_filepath):
             if bit_char == '1':
                 essential_bits.add(idx)
                 
-        print(f"    Total essential bits in .ebd file: {len(essential_bits)} bits")
+        print(f"[*] Total essential bits in .ebd file: {len(essential_bits)} bits")
         return essential_bits
     except FileNotFoundError:
         print(f"[!] ERROR: Could not find .ebd file at {ebd_filepath}.")
@@ -203,7 +203,7 @@ def get_fdri_data_start(bit_data):
     start_fdri_word = int.from_bytes(start_fdri_bytes, byteorder='big')
 
     if (start_fdri_word >> 28) != 0x5:
-        print("[!] ERROR: Type 2 Write FDRI command does not begin with 0x5 header.")
+        print("[!] ERROR: Type 2 Write FDRI command does not begin with 0x5 MSB.")
         return -1
     
     fdri_data_start = match.start() + 8
@@ -325,20 +325,26 @@ def generate_faulty_bitstreams():
     # ---------------------------------------------------------
     elif CAMPAIGN_PHASE == 2:
         print(f"\n[PHASE 2] Executing Routing, LUT and DSP Structural Fault Injection Campaign")
-        ebd_bits = get_essential_bits(EBD_FILE) # Get bit offsets of essential logic from .ebd
-        ll_bits = get_all_ll_bits(LL_FILE)      # Get bit offsets of ll_bits to avoid repeat fault injections on same bits
-        
-        if not ebd_bits or not ll_bits:
-            print("[!] Missing necessary .ebd or .ll data. Exiting.")
+        ebd_bits = get_essential_bits(EBD_FILE) # Get bit offsets of essential logic from .ebd        
+        if not ebd_bits:
+            print("[!] Missing necessary .ebd data. Exiting.")
             return
 
         # 4a. Perform set subtraction to isolate untested targets
         # TODO: Check this - ll contains state/memory type 1 (BRAM) and 0 (slice logic). 
         # Type 1 BRAM are not available in .ebd so pre-excluded. 
         # Subtraction only removes ALL Type 0 from ebd ~ 8200 bits
-        ph2_all_targs = list(ebd_bits - ll_bits)
-        print(f"[*] Isolated un-tested bits (LUTs/Routing/DSPs) from .ebd for Phase 2 Injection: {len(ph2_all_targs)} bits")
-        
+        # ll_bits = get_all_ll_bits(LL_FILE)      # Get bit offsets of ll_bits to avoid repeat fault injections on same bits
+        # if not ll_bits:
+        #     print("[!] Missing necessary .ebd data. Exiting.")
+        #     return
+        # ph2_all_targs = list(ebd_bits - ll_bits)
+        # print(f"[*] Isolated un-tested bits (LUTs/Routing/DSPs) from .ebd for Phase 2 Injection: {len(ph2_all_targs)} bits")
+
+        # To use all ebd_bits, including overlaps with ll_bits
+        ph2_all_targs = list(ebd_bits)
+        print(f"[*] Available bits (LUTs/Routing/DSPs) from .ebd for Phase 2 Injection: {len(ph2_all_targs)} bits")
+
         # 4b. Select random sample from the massive list of untested targets
         sample_targs = min(MAX_PHASE2_TARGS, len(ph2_all_targs))
         ph2_targs = random.sample(ph2_all_targs, sample_targs)
@@ -369,22 +375,26 @@ def generate_faulty_bitstreams():
             return
 
         # Combine all mapped structural and logical active bits
-        ph3_all_targs = ebd_bits.union(ll_bits)
-        print(f"[*] Total bits excluded from PHASE 3: {len(ph3_all_targs)} bits")
+        # ph3_exclude_targs = ebd_bits.union(ll_bits)
+
+        # To include all bits in including overlaps with .ebd and .ll
+        ph3_exclude_targs = [] # Empty list
+        print(f"[*] Total bits excluded from PHASE 3: {len(ph3_exclude_targs)} bits")
+        print(f"[*] Total bits selected for PHASE 3 corruption: {total_payload_bits - len(ph3_exclude_targs)} bits")
         
         # Memory-efficient random sampling loop
         ph3_targs = []
-        print(f"[*] Finding {MAX_PHASE3_TARGS} unused random targets...")
+        print(f"[*] Finding {MAX_PHASE3_TARGS} untested random targets...")
         
         while len(ph3_targs) < MAX_PHASE3_TARGS:
             # Generate a random bit within the total payload universe
             candidate = random.randint(0, total_payload_bits - 1)
             
-            # Ensure it is not ph3_all_targs and not picked in PHASE 3
-            if candidate not in ph3_all_targs and candidate not in ph3_targs:
+            # Ensure it is not ph3_exclude_targs and not picked in PHASE 3
+            if candidate not in ph3_exclude_targs and candidate not in ph3_targs:
                 ph3_targs.append(candidate)
                 
-        print(f"[*] Commencing Bit Flips for {MAX_PHASE3_TARGS} random unused targets...\n")
+        print(f"[*] Commencing Bit Flips for {MAX_PHASE3_TARGS} random untested targets...\n")
         
         for i, abs_offset in enumerate(ph3_targs):
             faulty_data = bytearray(golden_data)
