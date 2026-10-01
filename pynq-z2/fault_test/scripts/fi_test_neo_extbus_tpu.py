@@ -13,7 +13,7 @@ UART_PORT = "/dev/ttyUSB11"      # TODO: Validate UART port using sudo dmesg -w 
 BAUD_RATE = 19200
 CORRUPT_BITSTREAMS_DIR = "../ph2_corrupt_bit"
 TEST_RESULTS_CSV = "../neo_extbus_tpu_fi_test_results.csv"
-LOGS_DIR = "../_neo_extbus_tpu_logs"            # Directory to store individual run logs
+LOGS_DIR = "../neo_extbus_tpu_logs"            # Directory to store individual run logs
 TIMEOUT_SEC = 5                 # Wait for UART response
 PROGRAM_FPGA_TCL = "program_fpga.tcl"
 IMAGE_COUNT = 5
@@ -174,17 +174,16 @@ def parse_fv(fv_string, golden_fv):
     gold_vals = golden_fv.split(',')
     
     # Extract nominal accuracy sent by the board
-    acc_nom = fv_vals[0]/100.0
+    acc_nom = int(fv_vals[0])/100.0
     
     # Compare each 10-value image chunk (Match = 1, Mismatch = 0)
-    b1 = '1' if fv_vals[1:11] == gold_vals[1:11] else '0'
-    b2 = '1' if fv_vals[11:21] == gold_vals[11:21] else '0'
-    b3 = '1' if fv_vals[21:31] == gold_vals[21:31] else '0'
-    b4 = '1' if fv_vals[31:41] == gold_vals[31:41] else '0'
-    b5 = '1' if fv_vals[41:51] == gold_vals[41:51] else '0'
-    
-    # Combine into the 5-bit result vector
-    img_results = f"{b1}{b2}{b3}{b4}{b5}"
+    # Assuming b is a list initialized as b = [None] * IMAGE_COUNT
+    b = [None] * IMAGE_COUNT
+    for i in range(IMAGE_COUNT):
+        b[i] = '1' if fv_vals[i*10+1:(i+1)*10+1] == gold_vals[i*10+1:(i+1)*10+1] else '0'
+
+    # Dynamically combine all elements into a single string
+    img_results = "".join(b)
     
     # Calculate real accuracy based on actual matched images vs golden "11111"
     # Formula: (Count of '1's / 5 total images)
@@ -295,7 +294,8 @@ def run_fault_campaign():
             writer.writerow([
                 i+1, 
                 file_basename, 
-                repr_fv if repr_fv else "NONE", 
+                repr_fv if repr_fv else "NONE",
+                img_results,
                 acc_nom,
                 acc_real,
                 result_info, 
@@ -308,7 +308,7 @@ def run_fault_campaign():
             
             print(f"  Result Info : {result_info}")
             print(f"  Test Result : {test_result}")
-            if fv and acc_real != "N/A": print(f"  Real Accuracy    : {acc_real:.2f}")
+            if fv and acc_real != "N/A": print(f"  Real Accuracy : {acc_real:.2f}")
 
     # Clean up
     ser.close()

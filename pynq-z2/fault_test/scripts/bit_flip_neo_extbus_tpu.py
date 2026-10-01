@@ -19,7 +19,7 @@ CORRUPT_BITSTREAMS_DIR = f"../ph{CAMPAIGN_PHASE}_corrupt_bit"
 LL_TARG_NODE = "neorv32_cfs_inst" # Set node search term
 MAX_PHASE1_TARGS = 6000    # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
 # Phase 2 Config
-MAX_PHASE2_TARGS = 2    # Maximum targets of essential bits extracted from .ebd corrupted in .bit
+MAX_PHASE2_TARGS = 10000    # Maximum targets of essential bits extracted from .ebd corrupted in .bit
 # Phase 3 Config
 MAX_PHASE3_TARGS = 10000    # Maximum targets of untested bits corrupted directly in .bit
 
