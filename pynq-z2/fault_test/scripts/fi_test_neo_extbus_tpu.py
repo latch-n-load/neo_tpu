@@ -11,7 +11,7 @@ import glob
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.bit"
 UART_PORT = "/dev/ttyUSB11"      # TODO: Validate UART port using sudo dmesg -w | grep tty
 BAUD_RATE = 19200
-CORRUPT_BITSTREAMS_DIR = "../ph2_corrupt_bit"
+CORRUPT_BITSTREAMS_DIR = "../ph3_corrupt_bit"
 TEST_RESULTS_CSV = "../neo_extbus_tpu_fi_test_results.csv"
 LOGS_DIR = "../neo_extbus_tpu_logs"            # Directory to store individual run logs
 TIMEOUT_SEC = 5                 # Wait for UART response
@@ -86,11 +86,10 @@ def read_uart_for_fv(ser, golden_fv=None):
     """
     Read UART and categorize result into one of the following result_info categories:
     1. Matches Golden FV
-    2. False Perfect FV
-    3. One or more faults
-    4. No result obtained (Timeout)
-    5. Hardware Exception
-    6. Invalid UART Payload (Truncated FV or Illegible binary) 
+    2. One or more faults
+    3. No result obtained (Timeout)
+    4. Hardware Exception
+    5. Invalid UART Payload (Truncated FV or Illegible binary) 
     Returns: (extracted_fv_string, result_info)
     """
     start_time = time.time()
@@ -111,8 +110,8 @@ def read_uart_for_fv(ser, golden_fv=None):
             except Exception:
                 pass
             
-            # Anti-Hang Protection: If buffer explodes past 5000 bytes, break early.
-            if len(raw_buffer) > 5000:
+            # Anti-Hang Protection: If buffer explodes past 1000 bytes, break early.
+            if len(raw_buffer) > 1000:
                 break
                 
         time.sleep(0.01)
@@ -134,9 +133,9 @@ def read_uart_for_fv(ser, golden_fv=None):
         elif fv == golden_fv.lower():
             # ser.reset_input_buffer()
             return fv, "Matches Golden FV"
-        # 1b. Check for False Perfect: Accuracy is 100, but internal image data mismatches
-        elif fv.split(',')[0] == '100' and fv != golden_fv:
-            return fv, "False Perfect FV"
+        # # 1b. Check for False Perfect: Accuracy is 100, but internal image data mismatches
+        # elif fv.split(',')[0] == '100' and fv != golden_fv:
+        #     return fv, "False Perfect FV"
         # 1c. Mismatch between fv and golden_fv
         else:
             # ser.reset_input_buffer()
@@ -239,7 +238,7 @@ def run_fault_campaign():
     print(f"    Golden Fault Vector obtained: {golden_fv}")
 
     # 3. Discover Corrupt Bitstreams
-    corrupt_files = glob.glob(os.path.join(CORRUPT_BITSTREAMS_DIR, "*.bit"))
+    corrupt_files = glob.glob(os.path.join(CORRUPT_BITSTREAMS_DIR, "seu_ph3*.bit"))
     total_tests = len(corrupt_files)
     if total_tests == 0:
         print("[!] No corrupt bitstreams found in directory. Exiting.")
@@ -289,13 +288,14 @@ def run_fault_campaign():
 
             # Convert to representative symbols in case of raw binary fv
             repr_fv = repr(fv) if fv else "NONE"
+            repr_img_results = repr(img_results)
 
             # Write Summary CSV
             writer.writerow([
                 i+1, 
                 file_basename, 
                 repr_fv if repr_fv else "NONE",
-                img_results,
+                repr_img_results,
                 acc_nom,
                 acc_real,
                 result_info, 

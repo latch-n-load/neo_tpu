@@ -13,7 +13,7 @@ EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrappe
 # 1: Target specific Verilog nodes using the .ll file (Precision Diagnostic)
 # 2: Target phase 1 untested bits using .ebd (Essential bits)
 # 3: Target phase 1 & phase 2 untested bits corrupting .bit directly (Full CRAM coverage)
-CAMPAIGN_PHASE = 2
+CAMPAIGN_PHASE = 3
 CORRUPT_BITSTREAMS_DIR = f"../ph{CAMPAIGN_PHASE}_corrupt_bit"
 # Phase 1 Config
 LL_TARG_NODE = "neorv32_cfs_inst" # Set node search term
@@ -398,12 +398,12 @@ def generate_faulty_bitstreams():
     # ---------------------------------------------------------------------------------------------------
     elif CAMPAIGN_PHASE == 3:
         print(f"\n[PHASE 3] Executing Random FDRI Payload Campaign")
-        ebd_bits = get_essential_bits(EBD_FILE)
-        ll_bits = get_all_ll_bits(LL_FILE)
+        # ebd_bits = get_essential_bits(EBD_FILE)
+        # ll_bits = get_all_ll_bits(LL_FILE)
         
-        if not ebd_bits or not ll_bits:
-            print("[!] Missing necessary .ebd or .ll data. Exiting.")
-            return
+        # if not ebd_bits or not ll_bits:
+        #     print("[!] Missing necessary .ebd or .ll data. Exiting.")
+        #     return
 
         # Combine all mapped structural and logical active bits
         # ph3_exclude_targs = ebd_bits.union(ll_bits)
