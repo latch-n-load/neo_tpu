@@ -1,7 +1,8 @@
 # Ale
-/pynq-z2/fault_test/*corrupt_bit/
-/pynq-z2/fault_test/*logs/
+/pynq-z2/fault_test/corrupt_bit*/
+/pynq-z2/fault_test/logs*/
 /pynq-z2/fault_test/*.csv
 *.ebd
 *.ll
 *.ebc
+pynq-z2/fault_test/scripts/__pycache__
