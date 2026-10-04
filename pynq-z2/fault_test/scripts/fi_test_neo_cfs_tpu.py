@@ -21,7 +21,7 @@ PROGRAM_FPGA_TCL = "program_fpga.tcl"
 # --- Campaign Phase & Pipeline Configuration ---
 CAMPAIGN_PHASE = 1
 LL_TARG_NODE = "neorv32_cfs_inst" 
-MAX_PHASE1_TARGS = 6000 # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
+MAX_PHASE1_TARGS = 10000 # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
 MAX_PHASE2_TARGS = 10000 # Maximum targets of essential bits extracted from .ebd corrupted in .bit
 MAX_PHASE3_TARGS = 10000 # Maximum targets of untested bits corrupted directly in .bit
 BATCH_SIZE = 100 # Number of bitstreams to generate and test in one batch
@@ -31,6 +31,7 @@ CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}"
 TEST_RESULTS_CSV = f"../fi_results_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}.csv"
 LOGS_DIR = f"../logs_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" # Directory to store individual run logs  
 
+# REGEX for 32 HEX on UART_o, from neo_cfs_tpu
 FV_REGEX = re.compile(r'([0-9a-fA-F]{32})')
 
 def generate_campaign_targets(total_payload_bits):
@@ -57,7 +58,7 @@ def generate_campaign_targets(total_payload_bits):
 
     elif CAMPAIGN_PHASE == 3:
         print(f"\n[*] [PHASE 3] Generating Random Payload Targets")
-        ph3_exclude = [] # Exclusions disabled
+        ph3_exclude = [] # .ll and .ebd exclusions disabled
         sample_size = MAX_PHASE3_TARGS
         
         selected = set()
@@ -72,7 +73,7 @@ def generate_campaign_targets(total_payload_bits):
 def run_pipelined_campaign():
     st_time = time.time()
     print("==================================================")
-    print("      PIPELINED FAULT SIMULATION (CFS_TPU)        ")
+    print(f"        FAULT SIMULATION ({DESIGN_NAME.upper()}) ")
     print("==================================================")
     
     os.makedirs(CORRUPT_BITSTREAMS_DIR, exist_ok=True)
@@ -83,8 +84,8 @@ def run_pipelined_campaign():
     try:
         ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC)
         if ser.is_open:
-                    print (f"[*] Opened UART Serial Port")
-                    print (f"    Name: {ser.name}, Baudrate: {ser.baudrate}")
+            print (f"[*] Opened UART Serial Port")
+            print (f"    Name: {ser.name}, Baudrate: {ser.baudrate}")
     except serial.SerialException as e:
         print(f"[!] Error opening UART: {e}")
         return
@@ -115,7 +116,7 @@ def run_pipelined_campaign():
     if not golden_fv:
         print(f"[!] Failed to obtain legible Golden Fault Vector. Info: {result_info}")
         return
-    print(f"    Golden Fault Vector obtained: {golden_fv}")
+    print(f"    Golden Fault Vector obtained:\n    {golden_fv}")
 
     # 4. Generate Target Pool (Parse Files ONCE)
     campaign_targets = generate_campaign_targets(total_payload)
@@ -129,15 +130,15 @@ def run_pipelined_campaign():
     with open(TEST_RESULTS_CSV, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([
-            'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Result_Info', 
-            'Test_Result', 'Accuracy', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Information'
+            'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Accuracy','Result_Info',
+             Test_Result', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Information'
         ])
 
         # 6. Pipeline Main Loop
         for batch_start in range(0, total_tests, BATCH_SIZE):
             utils.cleanup_batch(CORRUPT_BITSTREAMS_DIR) # Delete previous batch files
             batch_targets = campaign_targets[batch_start : batch_start + BATCH_SIZE]
-            batch_metadata = {} # In-memory metadata lookup
+            batch_metadata = {}
             
             print(f"\n[*] Generating Batch {batch_start//BATCH_SIZE + 1}...")
             
@@ -148,7 +149,7 @@ def run_pipelined_campaign():
                 out_path = os.path.join(CORRUPT_BITSTREAMS_DIR, basename)
                 
                 utils.generate_corrupt_bitstream(golden_data, abs_offset, fdri_start, out_path)
-                batch_metadata[basename] = info # Store metadata in memory
+                batch_metadata[basename] = info
             print(f"    Generated {BATCH_SIZE} corrupt bitstreams for Batch {batch_start//BATCH_SIZE + 1}")
                 
             # --- SIMULATION PHASE ---
@@ -174,11 +175,12 @@ def run_pipelined_campaign():
                     test_result = "Fail"
 
                 repr_fv = repr(fv) if fv else "NONE"
-                
+                'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Accuracy','Result_Info',
+                Test_Result', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Information'                
                 # Write Outputs
                 writer.writerow([
-                    test_idx, basename, repr_fv, result_info, test_result, 
-                    acc, clint, dma_lbl, dma_img, ll_info
+                    test_idx, basename, repr_fv, acc, result_info, test_result, 
+                    clint, dma_lbl, dma_img, ll_info
                 ])
                 log_file = os.path.join(LOGS_DIR, f"log_{basename}.log")
                 utils.write_hex_log(log_file, basename, repr_fv, test_result, ll_info)

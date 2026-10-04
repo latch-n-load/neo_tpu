@@ -1,314 +1,196 @@
-import subprocess
 import serial
-import shutil
 import time
 import csv
 import os
 import re
-import glob
+import random
+import utils  # Import utility functions
 
 # --- Configuration ---
 GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.bit"
-UART_PORT = "/dev/ttyUSB11"      # TODO: Validate UART port using sudo dmesg -w | grep tty
-BAUD_RATE = 19200
-CORRUPT_BITSTREAMS_DIR = "../ph3_corrupt_bit"
-TEST_RESULTS_CSV = "../neo_extbus_tpu_fi_test_results.csv"
-LOGS_DIR = "../neo_extbus_tpu_logs"            # Directory to store individual run logs
-TIMEOUT_SEC = 5                 # Wait for UART response
-PROGRAM_FPGA_TCL = "program_fpga.tcl"
-IMAGE_COUNT = 5
+LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ll"
+EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ebd" 
 
-# Regex to capture exactly 32 hex characters
-FV_REGEX = re.compile(r'(\d+(?:,\d+){50})') # Raw String re 51 values
+UART_PORT = "/dev/ttyUSB11" # TODO: Validate UART port using sudo dmesg -w | grep tty
+BAUD_RATE = 921600
+TIMEOUT_SEC = 5 # Wait for UART response
+PROGRAM_FPGA_TCL = "program_fpga.tcl"    
 
-def start_xsct_session():
-    """Launch XSCT as a persistent background process."""
-    print("[*] Starting XSCT session...")
-    xsct_proc = subprocess.Popen(
-        ["xsct", PROGRAM_FPGA_TCL],
-        stdin=subprocess.PIPE, # Get input
-        stdout=subprocess.PIPE, # Get output
-        stderr=subprocess.PIPE, # Get errors
-        text=True,
-        bufsize=1 # Line buffered
-    )
+# --- Campaign Phase & Pipeline Configuration ---
+CAMPAIGN_PHASE = 1
+LL_TARG_NODE = None 
+MAX_PHASE1_TARGS = 10000 # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
+MAX_PHASE2_TARGS = 10000 # Maximum targets of essential bits extracted from .ebd corrupted in .bit
+MAX_PHASE3_TARGS = 10000 # Maximum targets of untested bits corrupted directly in .bit
+BATCH_SIZE = 100 # Number of bitstreams to generate and test in one batch
+
+DESIGN_NAME = "neo_extbus_tpu"
+CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" 
+TEST_RESULTS_CSV = f"../fi_results_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}.csv"
+LOGS_DIR = f"../logs_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" # Directory to store individual run logs      
+
+# REGEX for 51 csv UART_o, from neo_extbus_tpu
+FV_REGEX = re.compile(r'(\d+(?:,\d+){50})') 
+
+def generate_campaign_targets(total_payload_bits):
+    """Parses files ONCE and returns a unified list of (abs_bit_offset, ll_info) tuples."""
+    targets = []
     
-    # Wait for the TCL script to print "READY"
-    while True:
-        line = xsct_proc.stdout.readline()
+    if CAMPAIGN_PHASE == 1:
+        print(f"\n[*] [PHASE 1] Extracting Target Node: '{LL_TARG_NODE}'")
+        ph1_all_targs = utils.get_ll_targs(LL_FILE, MAX_PHASE1_TARGS, target_keyword=LL_TARG_NODE)
+        if not ph1_all_targs: return []
         
-        # --- DEBUG PRINT ---
-        if line:
-            print(f"[XSCT INIT] {line.strip()}")
+        sample_size = min(MAX_PHASE1_TARGS, len(ph1_all_targs))
+        sampled = random.sample(ph1_all_targs, sample_size) if len(ph1_all_targs) > sample_size else ph1_all_targs
+        targets = [(t['abs_bit_offset'], t['info']) for t in sampled]
 
-        if "READY" in line:
-            print("    XSCT connected to hardware and ready!")
-            break
-        if line == "": # EOF means XSCT crashed
-            print("[!] FATAL: XSCT failed to start or crashed.")
-            print("\n[XSCT CRASH LOG]:\n", xsct_proc.stderr.read())
-            return None
-            
-    return xsct_proc
-
-def program_fpga(xsct_proc, bitstream_path):
-    """Send bitstream path to persistent XSCT and wait for confirmation."""
-    # Write .bit path to XSCT stdin
-    xsct_proc.stdin.write(bitstream_path + "\n")
-    xsct_proc.stdin.flush()
-    
-    # Wait for the success/error token from XSCT's standard output
-    while True:
-        line = xsct_proc.stdout.readline()
+    elif CAMPAIGN_PHASE == 2:
+        print(f"\n[*] [PHASE 2] Extracting Structural Bits from .ebd")
+        ebd_bits = utils.get_essential_bits(EBD_FILE)
+        if not ebd_bits: return []
         
-        # --- DEBUG PRINT ---
-        # Print every puts from TCL script to terminal
-        if line:
-            print(f"  [XSCT] {line.strip()}")
-            
-        clean_line = line.strip()
+        sample_size = min(MAX_PHASE2_TARGS, len(ebd_bits))
+        sampled = random.sample(list(ebd_bits), sample_size)
+        targets = [(offset, "N/A") for offset in sampled]
+
+    elif CAMPAIGN_PHASE == 3:
+        print(f"\n[*] [PHASE 3] Generating Random Payload Targets")
+        ph3_exclude = [] # .ll and .ebd exclusions disabled
+        sample_size = MAX_PHASE3_TARGS
         
-        if clean_line == "PROGRAM_DONE":
-            return True
-        elif "FPGA_PROGRAM_ERROR" in clean_line:
-            return False
-        elif line == "": # Process died
-            print("\n[!] XSCT process terminated unexpectedly.")
-            
-            # Pull any fatal crash logs from stderr
-            error_output = xsct_proc.stderr.read()
-            if error_output:
-                print(f"\n[XSCT CRASH LOG]:\n{error_output}")
-                
-            return False
+        selected = set()
+        while len(selected) < sample_size:
+            candidate = random.randint(0, total_payload_bits - 1)
+            if candidate not in ph3_exclude:
+                selected.add(candidate)
+        targets = [(offset, "N/A") for offset in selected]
         
-def read_uart_for_fv(ser, golden_fv=None):
-    """
-    Read UART and categorize result into one of the following result_info categories:
-    1. Matches Golden FV
-    2. One or more faults
-    3. No result obtained (Timeout)
-    4. Hardware Exception
-    5. Invalid UART Payload (Truncated FV or Illegible binary) 
-    Returns: (extracted_fv_string, result_info)
-    """
-    start_time = time.time()
-    raw_buffer = b""
-    
-    while (time.time() - start_time) < TIMEOUT_SEC:
-        if ser.in_waiting > 0:
-            raw_buffer += ser.read(ser.in_waiting)
-            # Attempt to decode and check for the 32-char hex string
-            try:
-                decoded = raw_buffer.decode('utf-8', errors='ignore')
-                match = FV_REGEX.search(decoded)
-                if match:
-                    # Give it a tiny delay to finish printing the line, then break
-                    time.sleep(0.01)
-                    raw_buffer += ser.read(ser.in_waiting)
-                    break
-            except Exception:
-                pass
-            
-            # Anti-Hang Protection: If buffer explodes past 1000 bytes, break early.
-            if len(raw_buffer) > 1000:
-                break
-                
-        time.sleep(0.01)
+    return targets
 
-    decoded_output = raw_buffer.decode('utf-8', errors='replace')
-    # Create a legible version of raw binary using replacement character
-    # legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
-
-    # 1. Check for Legible Fault Vector
-    match = FV_REGEX.search(decoded_output)
-    if match:
-        fv = match.group(1).lower() # Convert group 1 to lower case and assign as fv
-        # print(f"[DEBUG] fv (match.group(1).lower()) = {fv}\n match.group(1) = {match.group(1)} ")
-        # print(f"[DEBUG] golden_fv = {golden_fv} golden_fv.lower() = {golden_fv.lower()} ")
-        # 1a. If fv == golden
-        if golden_fv is None:
-            # ser.reset_input_buffer()
-            return fv, "Golden FV Extracted"
-        elif fv == golden_fv.lower():
-            # ser.reset_input_buffer()
-            return fv, "Matches Golden FV"
-        # # 1b. Check for False Perfect: Accuracy is 100, but internal image data mismatches
-        # elif fv.split(',')[0] == '100' and fv != golden_fv:
-        #     return fv, "False Perfect FV"
-        # 1c. Mismatch between fv and golden_fv
-        else:
-            # ser.reset_input_buffer()
-            return fv, "One or more faults"
-
-    # 2. Check for No Results (Timeout)
-    if len(raw_buffer) == 0:
-        # ser.reset_input_buffer()
-        return None, "No result obtained"
-
-    # 3. Check for Hardware Exceptions / Crashes
-    lower_out = decoded_output.lower()
-    if "[cpu" in lower_out or "neov32" in lower_out or "access fault" in lower_out:
-        # Extract the first meaningful line of the error
-        first_error_line = "Unknown CPU Exception"
-        for line in decoded_output.splitlines():
-            clean_line = line.strip()
-            # Grab the first line that looks like a CPU error log
-            if "[cpu" in clean_line.lower() or "neorv32" in clean_line.lower() or "fault" in clean_line.lower():
-                first_error_line = clean_line
-                break
-        # ser.reset_input_buffer()
-        return first_error_line, "Hardware Exception"
-
-    # 6. Invalid UART Payload (Truncated FV or Illegible binary) 
-    # ser.reset_input_buffer()
-    return decoded_output, "Invalid UART Payload"
-
-def parse_fv(fv_string, golden_fv):
-    """
-    Parses the 51-value comma-separated vector and compares it against the golden vector.
-    Returns: (acc_nom, acc_real, img_results)
-    """
-    fv_vals = fv_string.split(',')
-    gold_vals = golden_fv.split(',')
-    
-    # Extract nominal accuracy sent by the board
-    acc_nom = int(fv_vals[0])/100.0
-    
-    # Compare each 10-value image chunk (Match = 1, Mismatch = 0)
-    # Assuming b is a list initialized as b = [None] * IMAGE_COUNT
-    b = [None] * IMAGE_COUNT
-    for i in range(IMAGE_COUNT):
-        b[i] = '1' if fv_vals[i*10+1:(i+1)*10+1] == gold_vals[i*10+1:(i+1)*10+1] else '0'
-
-    # Dynamically combine all elements into a single string
-    img_results = "".join(b)
-    
-    # Calculate real accuracy based on actual matched images vs golden "11111"
-    # Formula: (Count of '1's / 5 total images)
-    acc_real = (img_results.count('1') / 5.0)
-    
-    return acc_nom, acc_real, img_results
-
-def generate_log_file(filename, bitstream, fv, status):
-    """Generate an individual log file for each corrupt bitstream run."""
-    with open(filename, 'w') as f:
-        f.write(f"Corrupt_bit_file: {bitstream}\n")
-        f.write(f"Fault vector from FPGA: {fv if fv else 'NONE'}\n")
-        f.write(f"Test result: {status}\n")
-
-def run_fault_campaign():
+def run_pipelined_campaign():
     st_time = time.time()
     print("==================================================")
-    print("             FAULT SIMULATION CAMPAIGN            ")
+    print(f"        FAULT SIMULATION ({DESIGN_NAME.upper()}) ")
     print("==================================================")
-
-    # Refresh LOGS_DIR
-    # shutil.rmtree(LOGS_DIR, ignore_errors=True)
+    
+    os.makedirs(CORRUPT_BITSTREAMS_DIR, exist_ok=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
+    utils.cleanup_batch(CORRUPT_BITSTREAMS_DIR) # Clear out old runs
 
-    # 1. Initialize UART and xsct
-    # 1a. Open UART port
+    # 1. Initialize Hardware
     try:
-        ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC) # Create serial object "ser"
+        ser = serial.Serial(UART_PORT, BAUD_RATE, timeout=TIMEOUT_SEC)
         if ser.is_open:
             print (f"[*] Opened UART Serial Port")
             print (f"    Name: {ser.name}, Baudrate: {ser.baudrate}")
     except serial.SerialException as e:
         print(f"[!] Error opening UART: {e}")
         return
+        
+    xsct_proc = utils.start_xsct_session(PROGRAM_FPGA_TCL)
+    if not xsct_proc: return
 
-    # 1b. Launch XSCT session
-    xsct_proc = start_xsct_session()
-    if not xsct_proc:
-        return
+    # 2. Load & Prepare Golden Bitstream
+    with open(GOLDEN_BITSTREAM, 'rb') as f:
+        golden_data = bytearray(f.read())
 
-    # 2. Extract the Golden Fault Vector
+    # Check if board is ZYNQ-7000
+    if utils.find_sync_word(golden_data) == -1:return
+
+    # Get FDRI start and total payload
+    fdri_start, total_payload = utils.get_fdri_data_start(golden_data)
+    if fdri_start == -1: return
+    
+    # Disable CRC
+    golden_data = utils.disable_tail_crc(golden_data, fdri_start, total_payload)
+
+    # 3. Get Golden Fault Vector
     print("[*] Programming Golden Bitstream to obtain reference FV...")
-    if not program_fpga(xsct_proc, GOLDEN_BITSTREAM):
+    if not utils.program_fpga(xsct_proc, GOLDEN_BITSTREAM):
         print("[!] Failed to program golden bitstream. Exiting.")
         return
-        
-    golden_fv, result_info = read_uart_for_fv(ser, golden_fv=None)
-    
+    golden_fv, result_info = utils.read_uart_csv(ser, FV_REGEX, TIMEOUT_SEC)
     if not golden_fv:
-        print(f"[!] FATAL: Could not obtain legible Golden Fault Vector. Info: {result_info}")
+        print(f"[!] Failed to obtain legible Golden Fault Vector. Info: {result_info}")
         return
-        
-    print(f"    Golden Fault Vector obtained: {golden_fv}")
+    print(f"    Golden Fault Vector obtained:\n    {golden_fv}")
 
-    # 3. Discover Corrupt Bitstreams
-    corrupt_files = glob.glob(os.path.join(CORRUPT_BITSTREAMS_DIR, "seu_ph3*.bit"))
-    total_tests = len(corrupt_files)
+    # 4. Generate Target Pool (Parse Files ONCE)
+    campaign_targets = generate_campaign_targets(total_payload)
+    total_tests = len(campaign_targets)
     if total_tests == 0:
-        print("[!] No corrupt bitstreams found in directory. Exiting.")
+        print("[!] No valid targets found for the campaign. Exiting.")
         return
-        
-    print(f"[*] Found {total_tests} corrupt bitstreams. Starting campaign...")
+    print(f"[*] Starting Pipelined Campaign: {total_tests} total tests in batches of {BATCH_SIZE}.")
 
-    # 4. Open Summary CSV
+    # 5. Open Summary CSV
     with open(TEST_RESULTS_CSV, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([
-            'Test_ID', 
-            'Corrupt_bitstream_filename', 
-            'Fault_Vector',
-            'Image_Results',
-            'Accuracy_nominal', 
-            'Accuracy_real',
-            'Result_Info', 
-            'Test_Result',
+            'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Image_Results', 'Accuracy_nominal',
+            'Accuracy_real',  'Result_Info', 'Test_Result', LL_Information'
         ])
 
-        # 5. Main Testing Loop
-        for i, bitstream_file in enumerate(corrupt_files):
-            file_basename = os.path.basename(bitstream_file)
-            print(f"\n--- Test {i+1}/{total_tests} : {file_basename} ---")
+        # 6. Pipeline Main Loop
+        for batch_start in range(0, total_tests, BATCH_SIZE):
+            utils.cleanup_batch(CORRUPT_BITSTREAMS_DIR) # Delete previous batch files
+            batch_targets = campaign_targets[batch_start : batch_start + BATCH_SIZE]
+            batch_metadata = {}
             
-            # Program the board
-            if not program_fpga(xsct_proc, bitstream_file):
-                result_info = "XSCT Tool Error"
-                fv = None
-            else:
-                # Read UART and assign fault category
-                fv, result_info = read_uart_for_fv(ser, golden_fv)
+            print(f"\n[*] Generating Batch {batch_start//BATCH_SIZE + 1}...")
+            
+            # --- GENERATION PHASE ---
+            for i, (abs_offset, info) in enumerate(batch_targets):
+                test_id = batch_start + i + 1
+                basename = f"seu_ph{CAMPAIGN_PHASE}_{test_id}_{abs_offset}.bit"
+                out_path = os.path.join(CORRUPT_BITSTREAMS_DIR, basename)
+                
+                utils.generate_corrupt_bitstream(golden_data, abs_offset, fdri_start, out_path)
+                batch_metadata[basename] = info 
+            print(f"    Generated {BATCH_SIZE} corrupt bitstreams for Batch {batch_start//BATCH_SIZE + 1}")
+                
+            # --- SIMULATION PHASE ---
+            for basename, ll_info in batch_metadata.items():
+                test_idx = batch_start + list(batch_metadata.keys()).index(basename) + 1
+                print(f"\n--- Test {test_idx}/{total_tests} : {basename} ---")
+                
+                bit_path = os.path.join(CORRUPT_BITSTREAMS_DIR, basename)
+                
+                if not utils.program_fpga(xsct_proc, bit_path):
+                    result_info = "XSCT Tool Error"
+                    fv = None
+                else:
+                    fv, result_info = utils.read_uart_csv(ser, FV_REGEX, TIMEOUT_SEC, golden_fv)
 
-            # Analyze VALID FV only
-            acc_nom, acc_real, img_results = ("N/A", "N/A", "N/A")
-            test_result = "Fail" # Default to Fail for crashes/garbage
-            
-            # Parse FV if it was categorized as a valid hex string match
-            if fv and result_info in ["Matches Golden FV", "One or more faults"]:
-                acc_nom, acc_real, img_results = parse_fv(fv, golden_fv)
-                # Define Pass as a match with Golden FV. Any data corruption or crash is a Fail.
-                test_result = "Pass" if (result_info == "Matches Golden FV") else "Fail"
-            # FV contains garbage data or partial text; leave hardware faults as "N/A"
-            elif fv:
+                parsed_data = None
+                acc_nom, acc_real, img_results = ("N/A", "N/A", "N/A")
                 test_result = "Fail"
+                
+                if fv and result_info in ["Matches Golden FV", "One or more faults"]:
+                    parsed_data = utils.parse_csv_fv(fv, golden_fv)
+                    acc_nom, acc_real, img_results = parsed_data
+                    test_result = "Pass" if (result_info == "Matches Golden FV") else "Fail"
+                elif fv:
+                    test_result = "Fail"
 
-            # Convert to representative symbols in case of raw binary fv
-            repr_fv = repr(fv) if fv else "NONE"
-            repr_img_results = repr(img_results)
+                repr_fv = repr(fv) if fv else "NONE"
+                repr_img_results = repr(img_results)
 
-            # Write Summary CSV
-            writer.writerow([
-                i+1, 
-                file_basename, 
-                repr_fv if repr_fv else "NONE",
-                repr_img_results,
-                acc_nom,
-                acc_real,
-                result_info, 
-                test_result,
-            ])
-            
-            # Write Individual Log
-            log_filename = os.path.join(LOGS_DIR, f"log_{file_basename}.log")
-            generate_log_file(log_filename, file_basename, repr_fv, test_result)
-            
-            print(f"  Result Info : {result_info}")
-            print(f"  Test Result : {test_result}")
-            if fv and acc_real != "N/A": print(f"  Real Accuracy : {acc_real:.2f}")
+                'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Image_Results', 'Accuracy_nominal',
+                            'Accuracy_real',  'Result_Info', 'Test_Result', LL_Information'
+                
+                # Write Outputs
+                writer.writerow([
+                    test_idx, basename, repr_fv, repr_img_results, acc_nom, acc_real, 
+                    result_info, test_result, ll_info
+                ])
+                log_file = os.path.join(LOGS_DIR, f"log_{basename}.log")
+                utils.write_csv_log(log_file, basename, repr_fv, test_result, ll_info, parsed_data)
+                
+                print(f"  Result Info : {result_info}")
+                print(f"  Test Result : {test_result}")
+                if fv and acc_real != "N/A": print(f"  Real Accuracy : {acc_real:.2f}")
 
     # Clean up
     ser.close()
@@ -321,8 +203,7 @@ def run_fault_campaign():
         
     print("\n==================================================")
     print(f"Campaign Complete. Results saved to {TEST_RESULTS_CSV}")
-    print(f"Individual logs saved in {LOGS_DIR}/")
     print(f"Total Time: {(time.time() - st_time)/60:.2f} minutes")
 
 if __name__ == "__main__":
-    run_fault_campaign()
+    run_pipelined_campaign()
