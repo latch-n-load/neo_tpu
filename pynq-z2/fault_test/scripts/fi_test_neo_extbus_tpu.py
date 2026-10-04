@@ -7,14 +7,14 @@ import random
 import utils  # Import utility functions
 
 # --- Configuration ---
-GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.bit"
-LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ll"
-EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ebd" 
+GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.bit"
+LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.ll"
+EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.ebd" 
 
 UART_PORT = "/dev/ttyUSB11" # TODO: Validate UART port using sudo dmesg -w | grep tty
-BAUD_RATE = 921600
+BAUD_RATE = 19200 # Must match bitstream UART config
 TIMEOUT_SEC = 5 # Wait for UART response
-PROGRAM_FPGA_TCL = "program_fpga.tcl"    
+PROGRAM_FPGA_TCL = "program_fpga.tcl"
 
 # --- Campaign Phase & Pipeline Configuration ---
 CAMPAIGN_PHASE = 1
@@ -26,11 +26,11 @@ BATCH_SIZE = 100 # Number of bitstreams to generate and test in one batch
 
 DESIGN_NAME = "neo_extbus_tpu"
 CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" 
-TEST_RESULTS_CSV = f"../fi_results_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}.csv"
+TEST_RESULTS_CSV = f"../fi_result_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}.csv"
 LOGS_DIR = f"../logs_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" # Directory to store individual run logs      
 
 # REGEX for 51 csv UART_o, from neo_extbus_tpu
-FV_REGEX = re.compile(r'(\d+(?:,\d+){50})') 
+FV_REGEX = re.compile(r'(\d+(?:,\d+){50})')
 
 def generate_campaign_targets(total_payload_bits):
     """Parses files ONCE and returns a unified list of (abs_bit_offset, ll_info) tuples."""
@@ -129,7 +129,7 @@ def run_pipelined_campaign():
         writer = csv.writer(csvfile)
         writer.writerow([
             'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Image_Results', 'Accuracy_nominal',
-            'Accuracy_real',  'Result_Info', 'Test_Result', LL_Information'
+            'Accuracy_real',  'Result_Info', 'Test_Result', 'LL_Info'
         ])
 
         # 6. Pipeline Main Loop
@@ -176,9 +176,6 @@ def run_pipelined_campaign():
 
                 repr_fv = repr(fv) if fv else "NONE"
                 repr_img_results = repr(img_results)
-
-                'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Image_Results', 'Accuracy_nominal',
-                            'Accuracy_real',  'Result_Info', 'Test_Result', LL_Information'
                 
                 # Write Outputs
                 writer.writerow([

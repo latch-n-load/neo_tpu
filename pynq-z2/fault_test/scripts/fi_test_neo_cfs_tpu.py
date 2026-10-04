@@ -131,7 +131,7 @@ def run_pipelined_campaign():
         writer = csv.writer(csvfile)
         writer.writerow([
             'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Accuracy','Result_Info',
-             Test_Result', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Information'
+             'Test_Result', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Info'
         ])
 
         # 6. Pipeline Main Loop
@@ -175,8 +175,7 @@ def run_pipelined_campaign():
                     test_result = "Fail"
 
                 repr_fv = repr(fv) if fv else "NONE"
-                'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Accuracy','Result_Info',
-                Test_Result', 'CLINT_Fault', 'DMA_Lbl_Fault', 'DMA_Img_Fault', 'LL_Information'                
+            
                 # Write Outputs
                 writer.writerow([
                     test_idx, basename, repr_fv, acc, result_info, test_result, 
