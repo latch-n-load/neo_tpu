@@ -5,16 +5,20 @@ import re
 import random
 
 # --- Configuration ---
-GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.bit"
-LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ll"
-EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/axi_neo_tpu/BD1_wrapper.ebd" 
+GOLDEN_BITSTREAM = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.bit"
+LL_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.ll"
+EBD_FILE = "/home/a_akif/tesi/tesi_git/pynq-z2/fault_test/neo_extbus_tpu/BD1_wrapper.ebd" 
 
 # --- Campaign Mode Selection ---
 # 1: Target specific Verilog nodes using the .ll file (Precision Diagnostic)
-# 2: Target phase 1 untested bits using .ebd (Essential bits)
-# 3: Target phase 1 & phase 2 untested bits corrupting .bit directly (Full CRAM coverage)
-CAMPAIGN_PHASE = 3
-CORRUPT_BITSTREAMS_DIR = f"../ph{CAMPAIGN_PHASE}_corrupt_bit"
+# 2: Target random bits using .ebd (Essential bits)
+# 3: Target random bits corrupting .bit directly (Full CRAM coverage)
+# 4: Target known bit by corrupting .bit directly (1 .bit for debug)
+CAMPAIGN_PHASE = 4
+TARG_PH4_BIT_OFFSET = 12615333 # Target bit for direct corruption in Phase 4
+DESIGN_NAME = "neo_extbus_tpu"
+CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}"
+
 # Phase 1 Config
 LL_TARG_NODE = "neorv32_cfs_inst" # Set node search term
 MAX_PHASE1_TARGS = 6000    # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
@@ -438,6 +442,18 @@ def generate_faulty_bitstreams():
             print(f"  Saved : {out_filepath}")
             
         print(f"[*] Successfully generated {len(ph3_targs)} Phase 3 bitstreams.")
+
+    # Direct Corruption with known bit offset
+    elif CAMPAIGN_PHASE == 4:
+        print(f"\n[PHASE 4] Executing Direct FDRI Payload Corruption of Known Bit Offset")
+        faulty_data = bytearray(golden_data)
+        faulty_data, _, _, _, _ = flip_bit_in_bytearray(
+            faulty_data, TARG_PH4_BIT_OFFSET, fdri_data_start
+        )
+        out_filepath = os.path.join(CORRUPT_BITSTREAMS_DIR, f"seu_ph4_{TARG_PH4_BIT_OFFSET}.bit")
+        with open(out_filepath, 'wb') as out_f:
+            out_f.write(faulty_data)
+        print(f"  Saved : {out_filepath}")
 
     else: print("[!] Invalid CAMPAIGN_PHASE selected.")
     end_time = time.time()
