@@ -249,12 +249,15 @@ def _read_uart_base(ser, fv_regex, timeout_sec):
     # legible_binary = raw_buffer.decode('utf-8', errors='replace').strip()
 
     # Check for Hardware Exceptions / Crashes
+    hw_except_keywords = ("cpu", "neorv32", "fault", "bad")
     lower_out = decoded_output.lower()
-    if "[cpu" in lower_out or "neov32" in lower_out or "access fault" in lower_out:
+    if any(word in lower_out for word in hw_except_keywords):
+    # if "cpu" in lower_out or "neov32" in lower_out or "fault" in lower_out:
         first_error_line = "Unknown CPU Exception"
         for line in decoded_output.splitlines():
             clean_line = line.strip()
-            if "[cpu" in clean_line.lower() or "neorv32" in clean_line.lower() or "fault" in clean_line.lower():
+            if any(word in clean_line.lower() for word in hw_except_keywords):
+            # if "cpu" in clean_line.lower() or "neorv32" in clean_line.lower() or "fault" in clean_line.lower():
                 first_error_line = clean_line
                 break
         return None, decoded_output, first_error_line, "Hardware Exception"
@@ -359,9 +362,15 @@ def write_csv_log(filename, bitstream, fv, status, ll_info, parsed_data=None):
 # ==============================================================================
 
 def cleanup_batch(directory_path):
-    """Deletes all .bit files in the directory to save disk space between batches."""
+    """Deletes all .bit and .log files in directory_path"""
     for filename in os.listdir(directory_path):
         if filename.endswith(".bit"):
+            file_path = os.path.join(directory_path, filename)
+            try:
+                os.remove(file_path)
+            except Exception as e:
+                print(f"[!] Warning: Could not delete {file_path}. Reason: {e}")
+        elif filename.endswith(".log"):
             file_path = os.path.join(directory_path, filename)
             try:
                 os.remove(file_path)
