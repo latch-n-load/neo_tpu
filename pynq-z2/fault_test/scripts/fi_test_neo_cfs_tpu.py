@@ -13,13 +13,14 @@ GOLDEN_BITSTREAM = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/ne
 LL_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ll"
 EBD_FILE = "/home/a_akif/tesi/neo_tpu_pynq2/neo_tpu_pynq2.runs/impl_1/neo_tpu_pynq_wrapper.ebd" 
 
-UART_PORT = "/dev/ttyUSB11" # TODO: Validate UART port using sudo dmesg -w | grep tty
+# TODO: Validate UART port using sudo dmesg -w | grep tty or ls -l /dev/serial/by-id/
+UART_PORT = "/dev/ttyUSB10"
 BAUD_RATE = 921600
 TIMEOUT_SEC = 5 # Wait for UART response
 PROGRAM_FPGA_TCL = "program_fpga.tcl"    
 
 # --- Campaign Phase & Pipeline Configuration ---
-CAMPAIGN_PHASE = 1
+CAMPAIGN_PHASE = 2
 LL_TARG_NODE = "neorv32_cfs_inst" 
 MAX_PHASE1_TARGS = 10000 # Maximum targets of LL_TARG_NODE extracted from .ll corrupted in .bit
 MAX_PHASE2_TARGS = 10000 # Maximum targets of essential bits extracted from .ebd corrupted in .bit
@@ -27,9 +28,9 @@ MAX_PHASE3_TARGS = 10000 # Maximum targets of untested bits corrupted directly i
 BATCH_SIZE = 100 # Number of bitstreams to generate and test in one batch
 
 DESIGN_NAME = "neo_cfs_tpu"
-CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" 
-TEST_RESULTS_CSV = f"../fi_results_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}.csv"
-LOGS_DIR = f"../logs_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}" # Directory to store individual run logs  
+CORRUPT_BITSTREAMS_DIR = f"../corrupt_bit_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}_{time.strftime('%y%m%d')}"
+RESULTS_DIR = "../results/"
+LOGS_DIR = f"../logs_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}_{time.strftime('%y%m%d')}" # Directory to store individual run logs  
 
 # REGEX for 32 HEX on UART_o, from neo_cfs_tpu
 FV_REGEX = re.compile(r'([0-9a-fA-F]{32})')
@@ -77,8 +78,10 @@ def run_pipelined_campaign():
     print("==================================================")
     
     os.makedirs(CORRUPT_BITSTREAMS_DIR, exist_ok=True)
+    os.makedirs(RESULTS_DIR, exist_ok=True)
     os.makedirs(LOGS_DIR, exist_ok=True)
     utils.cleanup_batch(CORRUPT_BITSTREAMS_DIR) # Clear out old runs
+    utils.cleanup_batch(LOGS_DIR) # Clear out old runs
 
     # 1. Initialize Hardware
     try:
@@ -127,7 +130,8 @@ def run_pipelined_campaign():
     print(f"[*] Starting Pipelined Campaign: {total_tests} total tests in batches of {BATCH_SIZE}.")
 
     # 5. Open Summary CSV
-    with open(TEST_RESULTS_CSV, 'w', newline='') as csvfile:
+    result_path = os.path.join(RESULTS_DIR, f"fi_results_ph{CAMPAIGN_PHASE}_{DESIGN_NAME}_{time.strftime('%y%m%d')}.csv"),
+    with open(result_path, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow([
             'Test_ID', 'Corrupt_bitstream_filename', 'Fault_Vector', 'Accuracy','Result_Info',
@@ -198,7 +202,7 @@ def run_pipelined_campaign():
         xsct_proc.kill()
         
     print("\n==================================================")
-    print(f"Campaign Complete. Results saved to {TEST_RESULTS_CSV}")
+    print(f"Campaign Complete. Results saved to {result_path}")
     print(f"Total Time: {(time.time() - st_time)/60:.2f} minutes")
 
 if __name__ == "__main__":
